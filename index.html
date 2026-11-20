@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Построитель сечений 3D</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #12151c);
+      --sec-bg: var(--tg-theme-secondary-bg-color, #1e2330);
+      --text: var(--tg-theme-text-color, #f1f5f9);
+      --hint: var(--tg-theme-hint-color, #94a3b8);
+      --accent: var(--tg-theme-button-color, #3b82f6);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --border: rgba(148, 163, 184, 0.22);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; gap: 10px;
+      max-width: 740px; margin-inline: auto;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .btn, select {
+      background: var(--sec-bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 8px 12px; font-size: 13px; font-weight: 600;
+      cursor: pointer; outline: none;
+    }
+    .btn.primary, .btn.active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .canvas-wrap {
+      position: relative; width: 100%; border-radius: 14px;
+      overflow: hidden; background: #0b0d12; border: 1px solid var(--border);
+      touch-action: none; user-select: none;
+    }
+    canvas { display: block; width: 100%; height: auto; touch-action: none; }
+    .hint-bar {
+      background: var(--sec-bg); border-radius: 10px; padding: 8px 12px;
+      font-size: 12.5px; color: var(--hint); line-height: 1.4; border: 1px solid var(--border);
+    }
+    .hint-bar b { color: var(--text); }
+    .toggles { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; }
+    .toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .steps-box {
+      background: var(--sec-bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45;
+    }
+    .steps-box h4 { margin: 0 0 6px; font-size: 13.5px; }
+    .steps-box ol { margin: 0; padding-left: 18px; color: var(--hint); }
+    .steps-box li { margin-bottom: 4px; }
+    .steps-box li b { color: var(--text); }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="row">
+    <label class="btn primary" for="fileInput">📷 Фото задачи</label>
+    <input id="fileInput" type="file" accept="image/*" />
+    <select id="shapeSelect" style="flex:1; min-width: 170px;">
+      <option value="cube">Куб / Параллелепипед</option>
+      <option value="tetrahedron">3-уг. пирамида (Тетраэдр)</option>
+      <option value="quad_pyramid">4-уг. пирамида (любой 4-уг.)</option>
+      <option value="penta_pyramid">5-уг. пирамида</option>
+      <option value="hex_pyramid">6-уг. пирамида</option>
+      <option value="tri_prism">3-уг. призма</option>
+    </select>
+    <button class="btn" id="flipBtn" title="Перевернуть видимые/пунктирные грани">🔄 Глубина</button>
+  </div>
+
+  <div class="tabs">
+    <button class="btn active" id="modeAnchorBtn">1️⃣ Каркас</button>
+    <button class="btn" id="modePointsBtn">2️⃣ Точки (0/3)</button>
+  </div>
+
+  <div class="hint-bar" id="hintBar">
+    Перетащи <b>4 зелёных угла</b> на вершины фигуры на фото. Если основание нестандартное (трапеция и т.п.), поправь <b>голубые углы</b>.
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="row" id="anchorControls">
+    <button class="btn" id="resetRegBtn" style="display:none;">✨ Выровнять правильный многоугольник</button>
+  </div>
+
+  <div class="row" id="pointControls" style="display:none;">
+    <button class="btn" id="faceSideBtn">Грань: Передняя</button>
+    <button class="btn" id="undoPointBtn">↩ Убрать точку</button>
+    <button class="btn" id="clearPointsBtn">🗑 Сбросить</button>
+  </div>
+
+  <div class="toggles">
+    <label><input type="checkbox" id="showTraceCb" checked /> Метод следов</label>
+    <label><input type="checkbox" id="hideWireCb" /> Скрыть каркас (только сечение)</label>
+  </div>
+
+  <div class="steps-box">
+    <h4>Построение и метод следов:</h4>
+    <ol id="stepsList"><li>Переключись на «2️⃣ Точки» и поставь 3 точки на рёбрах или гранях.</li></ol>
+  </div>
+
+  <div class="row">
+    <button class="btn primary" id="downloadBtn" style="flex:1;">💾 Скачать PNG</button>
+    <button class="btn" id="sendTgBtn" style="display:none; flex:1;">📤 Отправить боту</button>
+  </div>
+
+<script>
+(() => {
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    try { tg.disableVerticalSwipes(); } catch (_) {}
+  }
+
+  // ---------- Векторная математика ----------
+  const EPS = 1e-5;
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+  const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const norm = a => Math.hypot(a[0], a[1], a[2]);
+  const dist3 = (a,b) => norm(sub(a,b));
+  const unit = a => { const n = norm(a); return n < EPS ? [0,0,0] : mul(a, 1/n); };
+
+  function solve2x2(a11, a12, a21, a22, b1, b2) {
+    const det = a11 * a22 - a12 * a21;
+    if (Math.abs(det) < 1e-8) return null;
+    return [(b1 * a22 - a12 * b2) / det, (a11 * b2 - b1 * a21) / det];
+  }
+
+  function solve3x3(A, b) {
+    const det =
+      A[0][0]*(A[1][1]*A[2][2]-A[1][2]*A[2][1]) -
+      A[0][1]*(A[1][0]*A[2][2]-A[1][2]*A[2][0]) +
+      A[0][2]*(A[1][0]*A[2][1]-A[1][1]*A[2][0]);
+    if (Math.abs(det) < 1e-8) return null;
+    return [
+      (b[0]*(A[1][1]*A[2][2]-A[1][2]*A[2][1]) - A[0][1]*(b[1]*A[2][2]-A[1][2]*b[2]) + A[0][2]*(b[1]*A[2][1]-A[1][1]*b[2])) / det,
+      (A[0][0]*(b[1]*A[2][2]-A[1][2]*b[2]) - b[0]*(A[1][0]*A[2][2]-A[1][2]*A[2][0]) + A[0][2]*(A[1][0]*b[2]-b[1]*A[2][0])) / det,
+      (A[0][0]*(A[1][1]*b[2]-b[1]*A[2][1]) - A[0][1]*(A[1][0]*b[2]-b[1]*A[2][0]) + b[0]*(A[1][0]*A[2][1]-A[1][1]*A[2][0])) / det
+    ];
+  }
+
+  function pointInPoly2D(px, py, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+      if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / ((yj - yi) || 1e-9) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
+  // ---------- Генератор фигур ----------
+  const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+  function computeRegularExtraBase(N) {
+    if (N <= 3) return [];
+    const pts = [];
+    for (let k = 0; k < N; k++) {
+      const a = 2 * Math.PI * k / N;
+      pts.push([Math.cos(a), Math.sin(a)]);
+    }
+    const u = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]];
+    const v = [pts[2][0] - pts[0][0], pts[2][1] - pts[0][1]];
+    const out = [];
+    for (let k = 3; k < N; k++) {
+      const xy = solve2x2(u[0], v[0], u[1], v[1], pts[k][0] - pts[0][0], pts[k][1] - pts[0][1]);
+      out.push(xy || [0, 0]);
+    }
+    return out;
+  }
+
+  const SHAPE_META = {
+    cube: {
+      name: 'Куб / Параллелепипед', type: 'prism',
+      defaultAnchors: [[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]]
+    },
+    tri_prism: {
+      name: '3-уг. призма', type: 'prism',
+      defaultAnchors: [[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]]
+    },
+    tetrahedron: {
+      name: '3-уг. пирамида', type: 'pyramid', N: 3,
+      defaultAnchors: [[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]]
+    },
+    quad_pyramid: {
+      name: '4-уг. пирамида', type: 'pyramid', N: 4,
+      defaultAnchors: [[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]]
+    },
+    penta_pyramid: {
+      name: '5-уг. пирамида', type: 'pyramid', N: 5,
+      defaultAnchors: [[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]]
+    },
+    hex_pyramid: {
+      name: '6-уг. пирамида', type: 'pyramid', N: 6,
+      defaultAnchors: [[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]]
+    }
+  };
+
+  function buildShapeGeom(shapeKey, extraBase) {
+    if (shapeKey === 'cube') {
+      const v3 = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+      return {
+        labels: ['A','B','C','D','A₁','B₁','C₁','D₁'],
+        v3, anchors: [0,1,3,4], extraIndices: [],
+        edges: [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]],
+        faces: [
+          { name:'ABCD', verts:[0,1,2,3], normal:[0,0,-1] },
+          { name:'A₁B₁C₁D₁', verts:[4,5,6,7], normal:[0,0,1] },
+          { name:'ABB₁A₁', verts:[0,1,5,4], normal:[0,-1,0] },
+          { name:'BCC₁B₁', verts:[1,2,6,5], normal:[1,0,0] },
+          { name:'CDD₁C₁', verts:[2,3,7,6], normal:[0,1,0] },
+          { name:'DAA₁D₁', verts:[3,0,4,7], normal:[-1,0,0] }
+        ]
+      };
+    }
+    if (shapeKey === 'tri_prism') {
+      const v3 = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,0,1],[0,1,1]];
+      return {
+        labels: ['A','B','C','A₁','B₁','C₁'],
+        v3, anchors: [0,1,2,3], extraIndices: [],
+        edges: [[0,1],[1,2],[2,0],[3,4],[4,5],[5,3],[0,3],[1,4],[2,5]],
+        faces: [
+          { name:'ABC', verts:[0,1,2], normal:[0,0,-1] },
+          { name:'A₁B₁C₁', verts:[3,4,5], normal:[0,0,1] },
+          { name:'ABB₁A₁', verts:[0,1,4,3], normal:[0,-1,0] },
+          { name:'ACC₁A₁', verts:[0,2,5,3], normal:[-1,0,0] },
+          { name:'BCC₁B₁', verts:[1,2,5,4], normal:[1,1,0] }
+        ]
+      };
+    }
+
+    // Пирамиды (N = 3, 4, 5, 6)
+    const N = SHAPE_META[shapeKey].N;
+    const labels = [...BASE_LETTERS.slice(0, N), 'S'];
+    const v3 = [[0,0,0], [1,0,0], [0,1,0]];
+    const extraIndices = [];
+    for (let k = 3; k < N; k++) {
+      const xy = extraBase[k - 3] || [0, 0];
+      v3.push([xy[0], xy[1], 0]);
+      extraIndices.push(k);
+    }
+    v3.push([0, 0, 1]); // S (индекс N)
+
+    // Центр тяжести для гарантированной наружной нормали
+    let center = [0,0,0];
+    v3.forEach(p => center = add(center, p));
+    center = mul(center, 1 / v3.length);
+
+    const edges = [];
+    const faces = [{ name: BASE_LETTERS.slice(0, N).join(''), verts: Array.from({length: N}, (_, i) => i), normal: [0, 0, -1] }];
+
+    for (let k = 0; k < N; k++) {
+      const kn = (k + 1) % N;
+      edges.push([k, kn], [k, N]);
+      let n = cross(sub(v3[kn], v3[k]), sub(v3[N], v3[k]));
+      if (dot(n, sub(v3[k], center)) < 0) n = mul(n, -1);
+      faces.push({ name: `${labels[k]}${labels[kn]}S`, verts: [k, kn, N], normal: n });
+    }
+
+    return { labels, v3, anchors: [0, 1, 2, N], extraIndices, edges, faces };
+  }
+
+  // ---------- Состояние ----------
+  const PT_NAMES = ['M', 'N', 'P'];
+  let state = {
+    img: null, imgW: 800, imgH: 600,
+    shapeKey: 'cube',
+    anchors: SHAPE_META.cube.defaultAnchors.map(([x,y]) => ({x,y})),
+    extraBase: [],
+    flipDepth: false,
+    mode: 'anchors',
+    preferBackFace: false,
+    points: [],
+    dragging: null, // { type:'anchor'|'extra'|'point', idx }
+    pointerPos: null,
+    snapPreview: null
+  };
+
+  function applyShapeDefaults(key) {
+    state.shapeKey = key;
+    const meta = SHAPE_META[key];
+    state.anchors = meta.defaultAnchors.map(([x,y]) => ({x,y}));
+    state.extraBase = meta.type === 'pyramid' ? computeRegularExtraBase(meta.N) : [];
+    state.points = [];
+    document.getElementById('resetRegBtn').style.display = (meta.N && meta.N > 3) ? 'inline-block' : 'none';
+  }
+
+  // Поддержка ?preset= от бота
+  try {
+    const presetParam = new URLSearchParams(location.search).get('preset');
+    if (presetParam) {
+      const data = JSON.parse(atob(presetParam.replace(/-/g, '+').replace(/_/g, '/')));
+      if (SHAPE_META[data.shape]) {
+        applyShapeDefaults(data.shape);
+        document.getElementById('shapeSelect').value = data.shape;
+        if (Array.isArray(data.anchors) && data.anchors.length === 4) {
+          state.anchors = data.anchors.map(([x,y]) => ({x,y}));
+        }
+        if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) {
+          state.extraBase = data.extraBase;
+        }
+        if (Array.isArray(data.points3)) {
+          state.points = data.points3.slice(0,3).map(p3 => ({ p3 }));
+        }
+      }
+    }
+  } catch (_) {}
+
+  // ---------- Проекция и сечение ----------
+  function getBasis() {
+    const [A, B, C, T] = state.anchors;
+    return {
+      O: A,
+      e1: { x: B.x - A.x, y: B.y - A.y },
+      e2: { x: C.x - A.x, y: C.y - A.y },
+      e3: { x: T.x - A.x, y: T.y - A.y }
+    };
+  }
+
+  function proj2D(p3, basis) {
+    return {
+      x: basis.O.x + p3[0]*basis.e1.x + p3[1]*basis.e2.x + p3[2]*basis.e3.x,
+      y: basis.O.y + p3[0]*basis.e1.y + p3[1]*basis.e2.y + p3[2]*basis.e3.y
+    };
+  }
+
+  function getCameraDir(basis) {
+    let V = cross([basis.e1.x, basis.e2.x, basis.e3.x], [basis.e1.y, basis.e2.y, basis.e3.y]);
+    const wantSign = (basis.e3.y <= 0 ? 1 : -1) * (state.flipDepth ? -1 : 1);
+    if (V[2] * wantSign < 0) V = mul(V, -1);
+    return V;
+  }
+
+  function isPointOnFace(p3, face, geom) {
+    const v0 = geom.v3[face.verts[0]];
+    return Math.abs(dot(face.normal, sub(p3, v0))) < 1e-4;
+  }
+
+  function facesContaining(p3, geom) {
+    return geom.faces.map((f, idx) => isPointOnFace(p3, f, geom) ? idx : -1).filter(i => i >= 0);
+  }
+
+  function computeSection() {
+    const geom = buildShapeGeom(state.shapeKey, state.extraBase);
+    const basis = getBasis();
+    const camV = getCameraDir(basis);
+    const faceVisible = geom.faces.map(f => dot(f.normal, camV) > 0);
+    const edgeVisible = geom.edges.map(([u, v]) =>
+      geom.faces.some((f, fi) => faceVisible[fi] && f.verts.includes(u) && f.verts.includes(v))
+    );
+
+    if (state.points.length < 3) {
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: [] };
+    }
+
+    const [P1, P2, P3] = state.points.map(p => p.p3);
+    const N = cross(sub(P2, P1), sub(P3, P1));
+    if (norm(N) < 1e-6) {
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: ['⚠️ Точки лежат на одной прямой — сдвинь одну из точек.'] };
+    }
+
+    const planeVal = p => dot(N, sub(p, P1));
+    const rawPts = [];
+    for (const [i, j] of geom.edges) {
+      const Vi = geom.v3[i], Vj = geom.v3[j];
+      const di = planeVal(Vi), dj = planeVal(Vj);
+      if (Math.abs(di) < EPS && Math.abs(dj) < EPS) rawPts.push(Vi, Vj);
+      else if (Math.abs(di) < EPS) rawPts.push(Vi);
+      else if (Math.abs(dj) < EPS) rawPts.push(Vj);
+      else if (di * dj < 0) {
+        const t = di / (di - dj);
+        rawPts.push(add(Vi, mul(sub(Vj, Vi), t)));
+      }
+    }
+
+    const uniq = [];
+    for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1e-4)) uniq.push(p);
+    if (uniq.length < 3) {
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: ['Плоскость не даёт сечения внутри фигуры.'] };
+    }
+
+    let center = [0,0,0];
+    uniq.forEach(p => center = add(center, p));
+    center = mul(center, 1 / uniq.length);
+    const uAxis = unit(sub(uniq[0], center));
+    const vAxis = cross(unit(N), uAxis);
+    uniq.sort((a, b) => {
+      const da = sub(a, center), db = sub(b, center);
+      return Math.atan2(dot(da, vAxis), dot(da, uAxis)) - Math.atan2(dot(db, vAxis), dot(db, uAxis));
+    });
+
+    const segVis = uniq.map((a, idx) => {
+      const mid = mul(add(a, uniq[(idx + 1) % uniq.length]), 0.5);
+      return geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(mid, f, geom));
+    });
+
+    const { traces, steps } = buildTraceExplanation(geom, uniq, state.points);
+    return { geom, basis, faceVisible, edgeVisible, poly: uniq, segVis, traces, steps };
+  }
+
+  function intersectLines3D(p1, d1, p2, d2) {
+    const c = cross(d1, d2);
+    const denom = dot(c, c);
+    if (denom < 1e-7) return null;
+    const t = dot(cross(sub(p2, p1), d2), c) / denom;
+    return add(p1, mul(d1, t));
+  }
+
+  function buildTraceExplanation(geom, poly, givenPts) {
+    const steps = [], traces = [];
+    const pts = givenPts.map((g, i) => ({ p3: g.p3, name: PT_NAMES[i], faces: facesContaining(g.p3, geom) }));
+    const knownSegs = [], faceHasLine = new Set();
+
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        const common = pts[i].faces.filter(fi => pts[j].faces.includes(fi));
+        if (common.length > 0 && !faceHasLine.has(common[0])) {
+          const fi = common[0];
+          faceHasLine.add(fi);
+          knownSegs.push({ a: pts[i].p3, b: pts[j].p3, nameA: pts[i].name, nameB: pts[j].name, fi });
+          steps.push(`Точки <b>${pts[i].name}</b> и <b>${pts[j].name}</b> лежат в одной грани <b>${geom.faces[fi].name}</b> — соединяем отрезком.`);
+        }
+      }
+    }
+
+    let traceCounter = 1;
+    for (let iter = 0; iter < 5; iter++) {
+      for (const seg of [...knownSegs]) {
+        const n1 = unit(geom.faces[seg.fi].normal);
+        for (let fj = 0; fj < geom.faces.length; fj++) {
+          if (faceHasLine.has(fj)) continue;
+          if (norm(cross(n1, unit(geom.faces[fj].normal))) < 1e-4) {
+            const pInF2 = pts.find(p => p.faces.includes(fj));
+            if (pInF2) {
+              faceHasLine.add(fj);
+              const onF = poly.filter(p => isPointOnFace(p, geom.faces[fj], geom));
+              if (onF.length >= 2) knownSegs.push({ a: onF[0], b: onF[1], nameA: pInF2.name, nameB: '…', fi: fj });
+              steps.push(`Грани <b>${geom.faces[seg.fi].name}</b> и <b>${geom.faces[fj].name}</b> параллельны — проводим через <b>${pInF2.name}</b> прямую, параллельную <b>${seg.nameA}${seg.nameB}</b>.`);
+            }
+          }
+        }
+      }
+
+      let addedTrace = false;
+      for (const seg of [...knownSegs]) {
+        const f1 = geom.faces[seg.fi];
+        const dirSeg = sub(seg.b, seg.a);
+        for (let k = 0; k < f1.verts.length; k++) {
+          const u = f1.verts[k], v = f1.verts[(k + 1) % f1.verts.length];
+          const Vu = geom.v3[u], Vv = geom.v3[v];
+          const T = intersectLines3D(seg.a, dirSeg, Vu, sub(Vv, Vu));
+          if (!T || dist3(T, [0, 0, 0]) > 4.0) continue;
+          const f2Idx = geom.faces.findIndex((f, idx) => idx !== seg.fi && f.verts.includes(u) && f.verts.includes(v));
+          if (f2Idx < 0 || faceHasLine.has(f2Idx)) continue;
+          const targetPt = pts.find(p => p.faces.includes(f2Idx) && dist3(p.p3, T) > 1e-3);
+          if (!targetPt) continue;
+
+          const edgeLen = dist3(Vu, Vv);
+          const onSeg = Math.abs(dist3(T, Vu) + dist3(T, Vv) - edgeLen) < 1e-4;
+          const tName = `X${traceCounter++}`;
+          if (!onSeg) {
+            traces.push(
+              [dist3(T, seg.a) < dist3(T, seg.b) ? seg.a : seg.b, T],
+              [dist3(T, Vu) < dist3(T, Vv) ? Vu : Vv, T],
+              [T, targetPt.p3]
+            );
+            steps.push(`<b>Метод следов:</b> продлеваем <b>${seg.nameA}${seg.nameB}</b> до пересечения с продолжением ребра <b>${geom.labels[u]}${geom.labels[v]}</b> в точке <b>${tName}</b> и соединяем с <b>${targetPt.name}</b> в грани <b>${geom.faces[f2Idx].name}</b>.`);
+          } else {
+            steps.push(`Прямая <b>${seg.nameA}${seg.nameB}</b> пересекает ребро <b>${geom.labels[u]}${geom.labels[v]}</b> в точке <b>${tName}</b> — соединяем с <b>${targetPt.name}</b>.`);
+          }
+          faceHasLine.add(f2Idx);
+          const onF2 = poly.filter(p => isPointOnFace(p, geom.faces[f2Idx], geom));
+          if (onF2.length >= 2) knownSegs.push({ a: onF2[0], b: onF2[1], nameA: tName, nameB: targetPt.name, fi: f2Idx });
+          addedTrace = true;
+          break;
+        }
+        if (addedTrace) break;
+      }
+      if (!addedTrace) break;
+    }
+
+    steps.push(`Замыкаем сечение — получаем <b>${poly.length}-угольник</b>.`);
+    return { traces, steps };
+  }
+
+  // ---------- Прилипание к рёбрам / вершинам / граням ----------
+  function findSnap3D(mx, my) {
+    const geom = buildShapeGeom(state.shapeKey, state.extraBase);
+    const basis = getBasis();
+    const camV = getCameraDir(basis);
+    const v2 = geom.v3.map(v => proj2D(v, basis));
+    const px = x => x * state.imgW, py = y => y * state.imgH;
+    const mPx = px(mx), mPy = py(my);
+
+    for (let i = 0; i < v2.length; i++) {
+      if (Math.hypot(px(v2[i].x) - mPx, py(v2[i].y) - mPy) < 17) {
+        return { p3: [...geom.v3[i]], x2: v2[i].x, y2: v2[i].y };
+      }
+    }
+
+    let bestEdge = null, bestDist = 16;
+    for (const [i, j] of geom.edges) {
+      const ax = px(v2[i].x), ay = py(v2[i].y), bx = px(v2[j].x), by = py(v2[j].y);
+      const dx = bx - ax, dy = by - ay, len2 = dx*dx + dy*dy;
+      if (len2 < 1) continue;
+      let t = Math.max(0, Math.min(1, ((mPx - ax)*dx + (mPy - ay)*dy) / len2));
+      const d = Math.hypot(ax + t*dx - mPx, ay + t*dy - mPy);
+      if (d < bestDist) {
+        bestDist = d;
+        const snappedT = Math.abs(t - 0.5) < 0.045 ? 0.5 : t;
+        const p3 = add(geom.v3[i], mul(sub(geom.v3[j], geom.v3[i]), snappedT));
+        const p2 = proj2D(p3, basis);
+        bestEdge = { p3, x2: p2.x, y2: p2.y };
+      }
+    }
+    if (bestEdge) return bestEdge;
+
+    const candFaces = geom.faces
+      .map((f, idx) => ({ f, idx, vis: dot(f.normal, camV) > 0 }))
+      .sort((a, b) => (state.preferBackFace ? a.vis - b.vis : b.vis - a.vis));
+
+    for (const { f } of candFaces) {
+      if (!pointInPoly2D(mx, my, f.verts.map(vi => v2[vi]))) continue;
+      const dF = dot(f.normal, geom.v3[f.verts[0]]);
+      const p3 = solve3x3([
+        [basis.e1.x, basis.e2.x, basis.e3.x],
+        [basis.e1.y, basis.e2.y, basis.e3.y],
+        [f.normal[0], f.normal[1], f.normal[2]]
+      ], [mx - basis.O.x, my - basis.O.y, dF]);
+      if (p3) return { p3, x2: mx, y2: my };
+    }
+    return null;
+  }
+
+  // ---------- Рендер ----------
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function drawLabel(c, text, x, y, color, halo, scale) {
+    c.save();
+    c.font = `700 ${14*scale}px sans-serif`;
+    c.lineWidth = 3.5 * scale;
+    c.strokeStyle = halo;
+    c.strokeText(text, x, y);
+    c.fillStyle = color;
+    c.fillText(text, x, y);
+    c.restore();
+  }
+
+  function renderToContext(targetCtx, w, h, isExport = false) {
+    targetCtx.clearRect(0, 0, w, h);
+    if (state.img) {
+      targetCtx.drawImage(state.img, 0, 0, w, h);
+    } else {
+      targetCtx.fillStyle = '#ffffff';
+      targetCtx.fillRect(0, 0, w, h);
+      targetCtx.strokeStyle = '#e2e8f0';
+      targetCtx.lineWidth = 1;
+      for (let gx = 40; gx < w; gx += 40) { targetCtx.beginPath(); targetCtx.moveTo(gx,0); targetCtx.lineTo(gx,h); targetCtx.stroke(); }
+      for (let gy = 40; gy < h; gy += 40) { targetCtx.beginPath(); targetCtx.moveTo(0,gy); targetCtx.lineTo(w,gy); targetCtx.stroke(); }
+    }
+
+    const res = computeSection();
+    const { geom, basis, edgeVisible, poly, segVis, traces } = res;
+    const X = p => p.x * w, Y = p => p.y * h;
+    const scale = Math.max(1, w / 650);
+    const hideWire = document.getElementById('hideWireCb').checked;
+    const showTrace = document.getElementById('showTraceCb').checked;
+    const v2 = geom.v3.map(v => proj2D(v, basis));
+
+    if (!hideWire) {
+      geom.edges.forEach(([i, j], idx) => {
+        targetCtx.save();
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(v2[i]), Y(v2[i]));
+        targetCtx.lineTo(X(v2[j]), Y(v2[j]));
+        targetCtx.lineWidth = (state.img ? 2.2 : 2) * scale;
+        if (edgeVisible[idx]) {
+          targetCtx.strokeStyle = state.img ? 'rgba(56, 189, 248, 0.72)' : '#1e293b';
+        } else {
+          targetCtx.strokeStyle = state.img ? 'rgba(56, 189, 248, 0.45)' : '#64748b';
+          targetCtx.setLineDash([6*scale, 5*scale]);
+        }
+        targetCtx.stroke();
+        targetCtx.restore();
+      });
+
+      geom.v3.forEach((_, i) => {
+        drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#0f172a', '#ffffff', scale);
+      });
+    }
+
+    if (showTrace && traces.length > 0) {
+      targetCtx.save();
+      targetCtx.strokeStyle = '#f97316';
+      targetCtx.lineWidth = 2 * scale;
+      targetCtx.setLineDash([5*scale, 4*scale]);
+      for (const [a3, b3] of traces) {
+        const a2 = proj2D(a3, basis), b2 = proj2D(b3, basis);
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(a2), Y(a2));
+        targetCtx.lineTo(X(b2), Y(b2));
+        targetCtx.stroke();
+      }
+      targetCtx.restore();
+    }
+
+    if (poly.length >= 3) {
+      const poly2 = poly.map(p => proj2D(p, basis));
+      targetCtx.save();
+      targetCtx.beginPath();
+      poly2.forEach((p, i) => i === 0 ? targetCtx.moveTo(X(p), Y(p)) : targetCtx.lineTo(X(p), Y(p)));
+      targetCtx.closePath();
+      targetCtx.fillStyle = 'rgba(239, 68, 68, 0.28)';
+      targetCtx.fill();
+
+      poly2.forEach((a, i) => {
+        const b = poly2[(i + 1) % poly2.length];
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(a), Y(a));
+        targetCtx.lineTo(X(b), Y(b));
+        targetCtx.lineWidth = 3.2 * scale;
+        targetCtx.strokeStyle = '#dc2626';
+        targetCtx.setLineDash(segVis[i] ? [] : [7*scale, 5*scale]);
+        targetCtx.stroke();
+      });
+      targetCtx.restore();
+    }
+
+    state.points.forEach((pt, idx) => {
+      const p2 = proj2D(pt.p3, basis);
+      targetCtx.beginPath();
+      targetCtx.arc(X(p2), Y(p2), 6*scale, 0, Math.PI*2);
+      targetCtx.fillStyle = '#ef4444';
+      targetCtx.fill();
+      targetCtx.lineWidth = 2*scale;
+      targetCtx.strokeStyle = '#ffffff';
+      targetCtx.stroke();
+      drawLabel(targetCtx, PT_NAMES[idx], X(p2) + 8*scale, Y(p2) - 8*scale, '#dc2626', '#ffffff', scale);
+    });
+
+    if (!isExport && state.mode === 'anchors') {
+      // Основные 4 зелёные ручки
+      state.anchors.forEach((a, idx) => {
+        const vIdx = geom.anchors[idx];
+        targetCtx.beginPath();
+        targetCtx.arc(X(a), Y(a), 10*scale, 0, Math.PI*2);
+        targetCtx.fillStyle = 'rgba(34, 197, 94, 0.92)';
+        targetCtx.fill();
+        targetCtx.lineWidth = 2.5*scale;
+        targetCtx.strokeStyle = '#ffffff';
+        targetCtx.stroke();
+        drawLabel(targetCtx, geom.labels[vIdx], X(a) - 18*scale, Y(a) - 10*scale, '#15803d', '#ffffff', scale);
+      });
+      // Дополнительные голубые ручки основания (D, E, F) для произвольных 4/5/6-угольников
+      geom.extraIndices.forEach((vIdx) => {
+        const p2 = v2[vIdx];
+        targetCtx.beginPath();
+        targetCtx.arc(X(p2), Y(p2), 8.5*scale, 0, Math.PI*2);
+        targetCtx.fillStyle = 'rgba(6, 182, 212, 0.92)';
+        targetCtx.fill();
+        targetCtx.lineWidth = 2*scale;
+        targetCtx.strokeStyle = '#ffffff';
+        targetCtx.stroke();
+      });
+    }
+
+    if (!isExport && state.snapPreview && state.mode === 'points') {
+      targetCtx.beginPath();
+      targetCtx.arc(state.snapPreview.x2 * w, state.snapPreview.y2 * h, 8*scale, 0, Math.PI*2);
+      targetCtx.strokeStyle = '#facc15';
+      targetCtx.lineWidth = 2.5*scale;
+      targetCtx.stroke();
+    }
+
+    return res;
+  }
+
+  function draw() {
+    canvas.width = state.imgW;
+    canvas.height = state.imgH;
+    const res = renderToContext(ctx, state.imgW, state.imgH, false);
+
+    if (state.dragging && state.pointerPos) {
+      const r = Math.min(state.imgW, state.imgH) * 0.14;
+      const mx = state.pointerPos.x * state.imgW, my = state.pointerPos.y * state.imgH;
+      const lx = mx < state.imgW * 0.5 ? state.imgW - r - 14 : r + 14, ly = r + 14;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.clip();
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(lx - r, ly - r, r*2, r*2);
+      ctx.drawImage(canvas, mx - r*0.45, my - r*0.45, r*0.9, r*0.9, lx - r, ly - r, r*2, r*2);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#3b82f6'; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(lx - 10, ly); ctx.lineTo(lx + 10, ly);
+      ctx.moveTo(lx, ly - 10); ctx.lineTo(lx, ly + 10);
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+
+    document.getElementById('modePointsBtn').textContent = `2️⃣ Точки (${state.points.length}/3)`;
+    const list = document.getElementById('stepsList');
+    list.innerHTML = res.steps.length > 0
+      ? res.steps.map(s => `<li>${s}</li>`).join('')
+      : '<li>Поставь 3 точки на рёбрах или гранях фигуры.</li>';
+
+    const sendBtn = document.getElementById('sendTgBtn');
+    if (tg && tg.initData && state.points.length === 3) sendBtn.style.display = 'inline-block';
+  }
+
+  // ---------- Ввод ----------
+  function getNormPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: Math.max(0, Math.min(1, (cx - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (cy - rect.top) / rect.height))
+    };
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const pos = getNormPos(e);
+    state.pointerPos = pos;
+    const hitR = 26 / canvas.getBoundingClientRect().width;
+    const geom = buildShapeGeom(state.shapeKey, state.extraBase);
+    const basis = getBasis();
+
+    if (state.mode === 'anchors') {
+      let best = null, bestD = hitR;
+      state.anchors.forEach((a, i) => {
+        const d = Math.hypot(a.x - pos.x, a.y - pos.y);
+        if (d < bestD) { bestD = d; best = { type: 'anchor', idx: i }; }
+      });
+      geom.extraIndices.forEach((vIdx, extraIdx) => {
+        const p2 = proj2D(geom.v3[vIdx], basis);
+        const d = Math.hypot(p2.x - pos.x, p2.y - pos.y);
+        if (d < bestD) { bestD = d; best = { type: 'extra', idx: extraIdx }; }
+      });
+      if (best) state.dragging = best;
+    } else {
+      let best = -1, bestD = hitR;
+      state.points.forEach((pt, i) => {
+        const p2 = proj2D(pt.p3, basis);
+        const d = Math.hypot(p2.x - pos.x, p2.y - pos.y);
+        if (d < bestD) { bestD = d; best = i; }
+      });
+      if (best >= 0) {
+        state.dragging = { type: 'point', idx: best };
+      } else if (state.points.length < 3) {
+        const snap = findSnap3D(pos.x, pos.y);
+        if (snap) {
+          state.points.push({ p3: snap.p3 });
+          try { tg?.HapticFeedback?.impactOccurred('light'); } catch (_) {}
+          draw();
+        }
+      }
+    }
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    const pos = getNormPos(e);
+    state.pointerPos = pos;
+    if (state.dragging) {
+      e.preventDefault();
+      if (state.dragging.type === 'anchor') {
+        state.anchors[state.dragging.idx] = pos;
+      } else if (state.dragging.type === 'extra') {
+        const basis = getBasis();
+        const xy = solve2x2(basis.e1.x, basis.e2.x, basis.e1.y, basis.e2.y, pos.x - basis.O.x, pos.y - basis.O.y);
+        if (xy) state.extraBase[state.dragging.idx] = xy;
+      } else {
+        const snap = findSnap3D(pos.x, pos.y);
+        if (snap) state.points[state.dragging.idx].p3 = snap.p3;
+      }
+      draw();
+    } else if (state.mode === 'points' && state.points.length < 3) {
+      state.snapPreview = findSnap3D(pos.x, pos.y);
+      draw();
+    }
+  });
+
+  window.addEventListener('pointerup', () => {
+    state.dragging = null;
+    state.pointerPos = null;
+    draw();
+  });
+
+  // ---------- Кнопки ----------
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        state.img = img;
+        const k = img.width > 1200 ? 1200 / img.width : 1;
+        state.imgW = Math.round(img.width * k);
+        state.imgH = Math.round(img.height * k);
+        draw();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('shapeSelect').addEventListener('change', (e) => {
+    applyShapeDefaults(e.target.value);
+    draw();
+  });
+
+  document.getElementById('resetRegBtn').addEventListener('click', () => {
+    const N = SHAPE_META[state.shapeKey].N;
+    if (N > 3) {
+      state.extraBase = computeRegularExtraBase(N);
+      draw();
+    }
+  });
+
+  document.getElementById('flipBtn').addEventListener('click', () => { state.flipDepth = !state.flipDepth; draw(); });
+
+  function setMode(m) {
+    state.mode = m;
+    document.getElementById('modeAnchorBtn').classList.toggle('active', m === 'anchors');
+    document.getElementById('modePointsBtn').classList.toggle('active', m === 'points');
+    document.getElementById('anchorControls').style.display = m === 'anchors' ? 'flex' : 'none';
+    document.getElementById('pointControls').style.display = m === 'points' ? 'flex' : 'none';
+    document.getElementById('hintBar').innerHTML = m === 'anchors'
+      ? 'Перетащи <b>4 зелёных угла</b> на вершины фигуры. Для трапеции/произвольного основания поправь <b>голубые углы</b>.'
+      : 'Кликай на <b>рёбра, середины или грани</b>, чтобы поставить 3 точки (<b>M, N, P</b>). Точки можно двигать.';
+    draw();
+  }
+
+  document.getElementById('modeAnchorBtn').addEventListener('click', () => setMode('anchors'));
+  document.getElementById('modePointsBtn').addEventListener('click', () => setMode('points'));
+  document.getElementById('faceSideBtn').addEventListener('click', (e) => {
+    state.preferBackFace = !state.preferBackFace;
+    e.target.textContent = state.preferBackFace ? 'Грань: Задняя' : 'Грань: Передняя';
+  });
+  document.getElementById('undoPointBtn').addEventListener('click', () => { state.points.pop(); draw(); });
+  document.getElementById('clearPointsBtn').addEventListener('click', () => { state.points = []; draw(); });
+  document.getElementById('showTraceCb').addEventListener('change', draw);
+  document.getElementById('hideWireCb').addEventListener('change', draw);
+
+  document.getElementById('downloadBtn').addEventListener('click', () => {
+    const out = document.createElement('canvas');
+    out.width = state.img ? state.img.naturalWidth : 1200;
+    out.height = state.img ? state.img.naturalHeight : 900;
+    renderToContext(out.getContext('2d'), out.width, out.height, true);
+    const link = document.createElement('a');
+    link.download = 'section.png';
+    link.href = out.toDataURL('image/png');
+    link.click();
+  });
+
+  document.getElementById('sendTgBtn').addEventListener('click', () => {
+    if (!tg) return;
+    tg.sendData(JSON.stringify({
+      shape: state.shapeKey,
+      anchors: state.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
+      extraBase: state.extraBase,
+      points3: state.points.map(p => p.p3.map(v => +v.toFixed(4)))
+    }));
+  });
+
+  draw();
+})();
+</script>
+</body>
+</html>
