@@ -3,112 +3,396 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Построитель сечений 3D</title>
+  <title>CONSTRUCT // SECT_3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: var(--tg-theme-bg-color, #12151c);
-      --sec-bg: var(--tg-theme-secondary-bg-color, #1e2330);
-      --text: var(--tg-theme-text-color, #f1f5f9);
-      --hint: var(--tg-theme-hint-color, #94a3b8);
-      --accent: var(--tg-theme-button-color, #3b82f6);
-      --accent-text: var(--tg-theme-button-text-color, #ffffff);
-      --border: rgba(148, 163, 184, 0.22);
+      --black: #000000;
+      --bg-panel: #030A04;
+      --bg-dim: #051608;
+      --g-bright: #00FF41;
+      --g-mid: #00A82B;
+      --g-dim: #00470F;
+      --g-pale: #9CFFAE;
     }
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body {
-      margin: 0; padding: 10px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg); color: var(--text);
-      display: flex; flex-direction: column; gap: 10px;
-      max-width: 740px; margin-inline: auto;
+    * {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      -webkit-tap-highlight-color: transparent;
     }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .btn, select {
-      background: var(--sec-bg); color: var(--text);
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 8px 12px; font-size: 13px; font-weight: 600;
-      cursor: pointer; outline: none;
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--black);
+      color: var(--g-bright);
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.35;
     }
-    .btn.primary, .btn.active { background: var(--accent); color: var(--accent-text); border-color: transparent; }
-    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .canvas-wrap {
-      position: relative; width: 100%; border-radius: 14px;
-      overflow: hidden; background: #0b0d12; border: 1px solid var(--border);
-      touch-action: none; user-select: none;
+    /* Едва заметные CRT-строки развёртки только по фону интерфейса */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 255, 65, 0.025) 3px
+      );
+      z-index: 99;
     }
-    canvas { display: block; width: 100%; height: auto; touch-action: none; }
-    .hint-bar {
-      background: var(--sec-bg); border-radius: 10px; padding: 8px 12px;
-      font-size: 12.5px; color: var(--hint); line-height: 1.4; border: 1px solid var(--border);
+
+    .shell {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .hint-bar b { color: var(--text); }
-    .toggles { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; }
-    .toggles label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-    .steps-box {
-      background: var(--sec-bg); border: 1px solid var(--border);
-      border-radius: 12px; padding: 10px 12px; font-size: 13px; line-height: 1.45;
+
+    /* Верхняя строка терминала */
+    .term-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 8px;
+      background: var(--bg-panel);
+      border: 1px solid var(--g-dim);
+      border-top: 2px solid var(--g-bright);
     }
-    .steps-box h4 { margin: 0 0 6px; font-size: 13.5px; }
-    .steps-box ol { margin: 0; padding-left: 18px; color: var(--hint); }
-    .steps-box li { margin-bottom: 4px; }
-    .steps-box li b { color: var(--text); }
+    .term-id {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.35);
+    }
+    .term-cursor {
+      display: inline-block;
+      width: 7px;
+      height: 13px;
+      background: var(--g-bright);
+      animation: blink 1.1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .head-btns { display: flex; gap: 5px; align-items: center; }
+
+    /* Тактильные терминальные кнопки */
+    .t-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 34px;
+      padding: 0 10px;
+      background: var(--black);
+      color: var(--g-bright);
+      border: 1px solid var(--g-mid);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .t-btn:active { background: var(--bg-dim); }
+    .t-btn.inv {
+      background: var(--g-bright);
+      color: var(--black);
+      border-color: var(--g-bright);
+    }
+    .t-btn.inv:active { background: var(--g-pale); }
+    .t-btn.dim { color: var(--g-mid); border-color: var(--g-dim); }
+    .t-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* Выбор фигуры: командная линейка */
+    .shape-bar {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(54px, 1fr));
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .shape-bar::-webkit-scrollbar { display: none; }
+    .shape-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 6px 2px;
+      background: var(--bg-panel);
+      border: 1px solid var(--g-dim);
+      color: var(--g-mid);
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .shape-slot svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+    .shape-slot.active {
+      background: var(--g-bright);
+      color: var(--black);
+      border-color: var(--g-bright);
+    }
+
+    /* Видоискатель чертежа */
+    .viewport {
+      position: relative;
+      background: var(--black);
+      border: 1px solid var(--g-mid);
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+    #rainCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.36;
+    }
+    #canvas {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: auto;
+      touch-action: none;
+      z-index: 2;
+    }
+    .hud-tag {
+      position: absolute;
+      z-index: 3;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid var(--g-dim);
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--g-bright);
+    }
+    .hud-tl { top: 6px; left: 6px; }
+    .hud-br { bottom: 6px; right: 6px; color: var(--g-mid); }
+
+    /* Панель управления */
+    .console-dock {
+      background: var(--bg-panel);
+      border: 1px solid var(--g-dim);
+      padding: 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+    .mode-btn {
+      height: 36px;
+      border: 1px solid var(--g-mid);
+      background: var(--black);
+      color: var(--g-mid);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .mode-btn.active {
+      background: var(--g-bright);
+      color: var(--black);
+      border-color: var(--g-bright);
+    }
+    .sub-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .sub-group { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+
+    /* Терминальные флаги [x] */
+    .flag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--g-dim);
+    }
+    .flag-lbl {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 7px;
+      border: 1px solid var(--g-dim);
+      background: var(--black);
+      color: var(--g-mid);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+    .flag-lbl input { display: none; }
+    .flag-box::before { content: "[ ]"; }
+    .flag-lbl:has(input:checked) {
+      border-color: var(--g-bright);
+      color: var(--g-bright);
+      background: var(--bg-dim);
+    }
+    .flag-lbl:has(input:checked) .flag-box::before { content: "[×]"; }
+
+    /* Лог построения */
+    .trace-log {
+      background: var(--bg-panel);
+      border: 1px solid var(--g-dim);
+    }
+    .trace-head {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: var(--bg-dim);
+      border-bottom: 1px solid var(--g-dim);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .trace-list {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0;
+    }
+    .trace-list li {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 6px;
+      padding: 5px 8px;
+      font-size: 11.5px;
+      color: var(--g-mid);
+      border-bottom: 1px solid rgba(0, 71, 15, 0.45);
+    }
+    .trace-list li:last-child { border-bottom: none; }
+    .trace-idx { color: var(--g-bright); font-weight: 700; }
+    .trace-list b { color: var(--g-bright); font-weight: 700; }
+
+    .foot-row { display: flex; gap: 6px; }
     input[type="file"] { display: none; }
   </style>
 </head>
 <body>
+<div class="shell">
 
-  <div class="row">
-    <label class="btn primary" for="fileInput">📷 Фото задачи</label>
-    <input id="fileInput" type="file" accept="image/*" />
-    <select id="shapeSelect" style="flex:1; min-width: 170px;">
-      <option value="cube">Куб / Параллелепипед</option>
-      <option value="tetrahedron">3-уг. пирамида (Тетраэдр)</option>
-      <option value="quad_pyramid">4-уг. пирамида (любой 4-уг.)</option>
-      <option value="penta_pyramid">5-уг. пирамида</option>
-      <option value="hex_pyramid">6-уг. пирамида</option>
-      <option value="tri_prism">3-уг. призма</option>
-    </select>
-    <button class="btn" id="flipBtn" title="Перевернуть видимые/пунктирные грани">🔄 Глубина</button>
+  <header class="term-head">
+    <div class="term-id">
+      <span>&gt; SECT_3D</span>
+      <span class="term-cursor"></span>
+    </div>
+    <div class="head-btns">
+      <label class="t-btn inv" for="fileInput" title="Загрузить изображение">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4H3v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        ФОТО
+      </label>
+      <input id="fileInput" type="file" accept="image/*" />
+      <button class="t-btn dim" id="clearPhotoBtn" style="display:none;" title="Сбросить фото">Х</button>
+      <button class="t-btn" id="flipBtn" title="Инверсия видимых граней">Z-ИНВ</button>
+    </div>
+  </header>
+
+  <div class="shape-bar" id="shapeBar">
+    <button class="shape-slot active" data-shape="cube">
+      <svg viewBox="0 0 24 24"><polygon points="4,8 15,8 15,19 4,19"/><polyline points="4,8 9,4 20,4 15,8"/><polyline points="20,4 20,15 15,19"/></svg>
+      <span>КУБ</span>
+    </button>
+    <button class="shape-slot" data-shape="tetrahedron">
+      <svg viewBox="0 0 24 24"><polygon points="12,3 4,18 20,17"/><line x1="12" y1="3" x2="11" y2="20"/><line x1="4" y1="18" x2="11" y2="20"/><line x1="20" y1="17" x2="11" y2="20"/></svg>
+      <span>ПИР-3</span>
+    </button>
+    <button class="shape-slot" data-shape="quad_pyramid">
+      <svg viewBox="0 0 24 24"><polygon points="12,3 3,18 14,20 21,15"/><line x1="12" y1="3" x2="14" y2="20"/><line x1="3" y1="18" x2="10" y2="14" stroke-dasharray="2 2"/><line x1="12" y1="3" x2="10" y2="14" stroke-dasharray="2 2"/></svg>
+      <span>ПИР-4</span>
+    </button>
+    <button class="shape-slot" data-shape="penta_pyramid">
+      <svg viewBox="0 0 24 24"><polygon points="12,3 3,15 12,20 21,15"/><line x1="12" y1="3" x2="12" y2="20"/><polyline points="3,15 8,12 16,12 21,15" stroke-dasharray="2 2"/></svg>
+      <span>ПИР-5</span>
+    </button>
+    <button class="shape-slot" data-shape="hex_pyramid">
+      <svg viewBox="0 0 24 24"><polygon points="12,3 3,15 8,20 16,20 21,15"/><line x1="12" y1="3" x2="8" y2="20"/><line x1="12" y1="3" x2="16" y2="20"/><polyline points="3,15 8,12 16,12 21,15" stroke-dasharray="2 2"/></svg>
+      <span>ПИР-6</span>
+    </button>
+    <button class="shape-slot" data-shape="tri_prism">
+      <svg viewBox="0 0 24 24"><polygon points="5,8 12,4 19,8"/><polygon points="5,18 12,21 19,18"/><line x1="5" y1="8" x2="5" y2="18"/><line x1="12" y1="4" x2="12" y2="21"/><line x1="19" y1="8" x2="19" y2="18"/></svg>
+      <span>ПРЗ-3</span>
+    </button>
   </div>
 
-  <div class="tabs">
-    <button class="btn active" id="modeAnchorBtn">1️⃣ Каркас</button>
-    <button class="btn" id="modePointsBtn">2️⃣ Точки (0/3)</button>
-  </div>
-
-  <div class="hint-bar" id="hintBar">
-    Перетащи <b>4 зелёных угла</b> на вершины фигуры на фото. Если основание нестандартное (трапеция и т.п.), поправь <b>голубые углы</b>.
-  </div>
-
-  <div class="canvas-wrap">
+  <div class="viewport" id="viewport">
+    <canvas id="rainCanvas"></canvas>
     <canvas id="canvas"></canvas>
+    <div class="hud-tag hud-tl" id="hudShape">КУБ // ГЕОМ</div>
+    <div class="hud-tag hud-br" id="hudStatus">КАРКАС [0/3]</div>
   </div>
 
-  <div class="row" id="anchorControls">
-    <button class="btn" id="resetRegBtn" style="display:none;">✨ Выровнять правильный многоугольник</button>
+  <div class="console-dock">
+    <div class="mode-switch">
+      <button class="mode-btn active" id="modeAnchorBtn">01 // КАРКАС</button>
+      <button class="mode-btn" id="modePointsBtn">02 // ТОЧКИ [0/3]</button>
+    </div>
+
+    <div class="sub-bar" id="anchorControls">
+      <span style="font-size:11px; color:var(--g-mid);" id="anchorHint">&gt; Наведите 4 прицела на углы фигуры</span>
+      <button class="t-btn" id="resetRegBtn" style="display:none; height:30px;">ВЫРОВНЯТЬ_ОСН</button>
+    </div>
+
+    <div class="sub-bar" id="pointControls" style="display:none;">
+      <button class="t-btn" id="faceSideBtn" style="height:30px;">ГРАНЬ: ПЕРЕД</button>
+      <div class="sub-group">
+        <button class="t-btn" id="undoPointBtn" style="height:30px;">ОТКАТ</button>
+        <button class="t-btn dim" id="clearPointsBtn" style="height:30px;">СБРОС</button>
+      </div>
+    </div>
+
+    <div class="flag-row">
+      <label class="flag-lbl"><input type="checkbox" id="showHatchCb" checked /><span class="flag-box"></span>ШТРИХ</label>
+      <label class="flag-lbl"><input type="checkbox" id="showTraceCb" checked /><span class="flag-box"></span>СЛЕДЫ</label>
+      <label class="flag-lbl"><input type="checkbox" id="showLabelsCb" checked /><span class="flag-box"></span>БУКВЫ</label>
+      <label class="flag-lbl"><input type="checkbox" id="hideWireCb" /><span class="flag-box"></span>ТОЛЬКО_СЕЧ</label>
+      <label class="flag-lbl" id="greenFilterWrap" style="display:none;"><input type="checkbox" id="greenFilterCb" /><span class="flag-box"></span>ЗЕЛ_ФИЛЬТР</label>
+    </div>
   </div>
 
-  <div class="row" id="pointControls" style="display:none;">
-    <button class="btn" id="faceSideBtn">Грань: Передняя</button>
-    <button class="btn" id="undoPointBtn">↩ Убрать точку</button>
-    <button class="btn" id="clearPointsBtn">🗑 Сбросить</button>
+  <div class="trace-log">
+    <div class="trace-head">
+      <span>&gt; ЛОГ_ПОСТРОЕНИЯ</span>
+      <span id="polyKindTag">[ ОЖИДАНИЕ ]</span>
+    </div>
+    <ol class="trace-list" id="stepsList">
+      <li><span class="trace-idx">01&gt;</span><span>Переключитесь на «02 // ТОЧКИ» и отметьте 3 точки M, N, P на рёбрах или гранях.</span></li>
+    </ol>
   </div>
 
-  <div class="toggles">
-    <label><input type="checkbox" id="showTraceCb" checked /> Метод следов</label>
-    <label><input type="checkbox" id="hideWireCb" /> Скрыть каркас (только сечение)</label>
+  <div class="foot-row">
+    <button class="t-btn inv" id="downloadBtn" style="flex:1; height:40px; font-size:12.5px;">&gt; СКАЧАТЬ_PNG</button>
+    <button class="t-btn" id="sendTgBtn" style="display:none; flex:1; height:40px; font-size:12.5px;">&gt; В_БОТА</button>
   </div>
 
-  <div class="steps-box">
-    <h4>Построение и метод следов:</h4>
-    <ol id="stepsList"><li>Переключись на «2️⃣ Точки» и поставь 3 точки на рёбрах или гранях.</li></ol>
-  </div>
-
-  <div class="row">
-    <button class="btn primary" id="downloadBtn" style="flex:1;">💾 Скачать PNG</button>
-    <button class="btn" id="sendTgBtn" style="display:none; flex:1;">📤 Отправить боту</button>
-  </div>
+</div>
 
 <script>
 (() => {
@@ -116,10 +400,50 @@
   if (tg) {
     tg.ready();
     tg.expand();
-    try { tg.disableVerticalSwipes(); } catch (_) {}
+    try {
+      tg.disableVerticalSwipes();
+      tg.setHeaderColor('#000000');
+      tg.setBackgroundColor('#000000');
+    } catch (_) {}
   }
 
-  // ---------- Векторная математика ----------
+  // ---------- 1. Фоновый код Матрицы (только когда нет фото) ----------
+  const rainCanvas = document.getElementById('rainCanvas');
+  const rCtx = rainCanvas.getContext('2d');
+  const GLYPHS = 'ｦｱｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
+  let rainDrops = [];
+  let lastRainTick = 0;
+
+  function initRain() {
+    const rect = document.getElementById('viewport').getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    rainCanvas.width = Math.round(rect.width);
+    rainCanvas.height = Math.round(rect.height);
+    const cols = Math.floor(rainCanvas.width / 16);
+    rainDrops = Array.from({ length: cols }, () => Math.floor(Math.random() * -25));
+  }
+
+  function tickRain(ts) {
+    if (!state.img) {
+      if (ts - lastRainTick > 75) {
+        lastRainTick = ts;
+        if (rainCanvas.width === 0) initRain();
+        rCtx.fillStyle = 'rgba(0, 0, 0, 0.16)';
+        rCtx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+        rCtx.font = '13px "JetBrains Mono", monospace';
+        for (let i = 0; i < rainDrops.length; i++) {
+          const ch = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+          rCtx.fillStyle = Math.random() > 0.9 ? '#9CFFAE' : '#008F11';
+          rCtx.fillText(ch, i * 16, rainDrops[i] * 16);
+          if (rainDrops[i] * 16 > rainCanvas.height && Math.random() > 0.96) rainDrops[i] = 0;
+          rainDrops[i]++;
+        }
+      }
+      requestAnimationFrame(tickRain);
+    }
+  }
+
+  // ---------- 2. Векторная математика ----------
   const EPS = 1e-5;
   const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
   const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
@@ -158,59 +482,36 @@
     return inside;
   }
 
-  // ---------- Генератор фигур ----------
+  // ---------- 3. Фигуры ----------
   const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   function computeRegularExtraBase(N) {
     if (N <= 3) return [];
-    const pts = [];
-    for (let k = 0; k < N; k++) {
-      const a = 2 * Math.PI * k / N;
-      pts.push([Math.cos(a), Math.sin(a)]);
-    }
+    const pts = Array.from({length: N}, (_, k) => [Math.cos(2*Math.PI*k/N), Math.sin(2*Math.PI*k/N)]);
     const u = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]];
     const v = [pts[2][0] - pts[0][0], pts[2][1] - pts[0][1]];
     const out = [];
     for (let k = 3; k < N; k++) {
-      const xy = solve2x2(u[0], v[0], u[1], v[1], pts[k][0] - pts[0][0], pts[k][1] - pts[0][1]);
-      out.push(xy || [0, 0]);
+      out.push(solve2x2(u[0], v[0], u[1], v[1], pts[k][0] - pts[0][0], pts[k][1] - pts[0][1]) || [0, 0]);
     }
     return out;
   }
 
   const SHAPE_META = {
-    cube: {
-      name: 'Куб / Параллелепипед', type: 'prism',
-      defaultAnchors: [[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]]
-    },
-    tri_prism: {
-      name: '3-уг. призма', type: 'prism',
-      defaultAnchors: [[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]]
-    },
-    tetrahedron: {
-      name: '3-уг. пирамида', type: 'pyramid', N: 3,
-      defaultAnchors: [[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]]
-    },
-    quad_pyramid: {
-      name: '4-уг. пирамида', type: 'pyramid', N: 4,
-      defaultAnchors: [[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]]
-    },
-    penta_pyramid: {
-      name: '5-уг. пирамида', type: 'pyramid', N: 5,
-      defaultAnchors: [[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]]
-    },
-    hex_pyramid: {
-      name: '6-уг. пирамида', type: 'pyramid', N: 6,
-      defaultAnchors: [[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]]
-    }
+    cube:          { title:'КУБ // PAR', type:'prism',   defaultAnchors:[[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]] },
+    tetrahedron:   { title:'ПИР-3 // TETRA', type:'pyramid', N:3, defaultAnchors:[[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]] },
+    quad_pyramid:  { title:'ПИР-4 // QUAD',  type:'pyramid', N:4, defaultAnchors:[[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]] },
+    penta_pyramid: { title:'ПИР-5 // PENTA', type:'pyramid', N:5, defaultAnchors:[[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]] },
+    hex_pyramid:   { title:'ПИР-6 // HEXA',  type:'pyramid', N:6, defaultAnchors:[[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]] },
+    tri_prism:     { title:'ПРЗ-3 // PRISM', type:'prism',   defaultAnchors:[[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]] }
   };
 
   function buildShapeGeom(shapeKey, extraBase) {
     if (shapeKey === 'cube') {
-      const v3 = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
       return {
         labels: ['A','B','C','D','A₁','B₁','C₁','D₁'],
-        v3, anchors: [0,1,3,4], extraIndices: [],
+        v3: [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],
+        anchors: [0,1,3,4], extraIndices: [],
         edges: [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]],
         faces: [
           { name:'ABCD', verts:[0,1,2,3], normal:[0,0,-1] },
@@ -223,10 +524,10 @@
       };
     }
     if (shapeKey === 'tri_prism') {
-      const v3 = [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,0,1],[0,1,1]];
       return {
         labels: ['A','B','C','A₁','B₁','C₁'],
-        v3, anchors: [0,1,2,3], extraIndices: [],
+        v3: [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,0,1],[0,1,1]],
+        anchors: [0,1,2,3], extraIndices: [],
         edges: [[0,1],[1,2],[2,0],[3,4],[4,5],[5,3],[0,3],[1,4],[2,5]],
         faces: [
           { name:'ABC', verts:[0,1,2], normal:[0,0,-1] },
@@ -237,8 +538,6 @@
         ]
       };
     }
-
-    // Пирамиды (N = 3, 4, 5, 6)
     const N = SHAPE_META[shapeKey].N;
     const labels = [...BASE_LETTERS.slice(0, N), 'S'];
     const v3 = [[0,0,0], [1,0,0], [0,1,0]];
@@ -248,16 +547,14 @@
       v3.push([xy[0], xy[1], 0]);
       extraIndices.push(k);
     }
-    v3.push([0, 0, 1]); // S (индекс N)
+    v3.push([0, 0, 1]);
 
-    // Центр тяжести для гарантированной наружной нормали
     let center = [0,0,0];
     v3.forEach(p => center = add(center, p));
     center = mul(center, 1 / v3.length);
 
     const edges = [];
-    const faces = [{ name: BASE_LETTERS.slice(0, N).join(''), verts: Array.from({length: N}, (_, i) => i), normal: [0, 0, -1] }];
-
+    const faces = [{ name: BASE_LETTERS.slice(0, N).join(''), verts: Array.from({length: N}, (_, i) => i), normal: [0,0,-1] }];
     for (let k = 0; k < N; k++) {
       const kn = (k + 1) % N;
       edges.push([k, kn], [k, N]);
@@ -265,14 +562,13 @@
       if (dot(n, sub(v3[k], center)) < 0) n = mul(n, -1);
       faces.push({ name: `${labels[k]}${labels[kn]}S`, verts: [k, kn, N], normal: n });
     }
-
     return { labels, v3, anchors: [0, 1, 2, N], extraIndices, edges, faces };
   }
 
-  // ---------- Состояние ----------
+  // ---------- 4. Состояние ----------
   const PT_NAMES = ['M', 'N', 'P'];
   let state = {
-    img: null, imgW: 800, imgH: 600,
+    img: null, imgW: 840, imgH: 580,
     shapeKey: 'cube',
     anchors: SHAPE_META.cube.defaultAnchors.map(([x,y]) => ({x,y})),
     extraBase: [],
@@ -280,7 +576,7 @@
     mode: 'anchors',
     preferBackFace: false,
     points: [],
-    dragging: null, // { type:'anchor'|'extra'|'point', idx }
+    dragging: null,
     pointerPos: null,
     snapPreview: null
   };
@@ -291,39 +587,31 @@
     state.anchors = meta.defaultAnchors.map(([x,y]) => ({x,y}));
     state.extraBase = meta.type === 'pyramid' ? computeRegularExtraBase(meta.N) : [];
     state.points = [];
-    document.getElementById('resetRegBtn').style.display = (meta.N && meta.N > 3) ? 'inline-block' : 'none';
+    document.querySelectorAll('.shape-slot').forEach(el => el.classList.toggle('active', el.dataset.shape === key));
+    document.getElementById('hudShape').textContent = meta.title;
+    document.getElementById('resetRegBtn').style.display = (meta.N && meta.N > 3) ? 'inline-flex' : 'none';
+    document.getElementById('anchorHint').textContent = (meta.N && meta.N > 3)
+      ? '> Яркие прицелы [+] опора, тусклые [+] основание'
+      : '> Совместите 4 прицела [+] с углами фигуры';
   }
 
-  // Поддержка ?preset= от бота
   try {
     const presetParam = new URLSearchParams(location.search).get('preset');
     if (presetParam) {
       const data = JSON.parse(atob(presetParam.replace(/-/g, '+').replace(/_/g, '/')));
       if (SHAPE_META[data.shape]) {
         applyShapeDefaults(data.shape);
-        document.getElementById('shapeSelect').value = data.shape;
-        if (Array.isArray(data.anchors) && data.anchors.length === 4) {
-          state.anchors = data.anchors.map(([x,y]) => ({x,y}));
-        }
-        if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) {
-          state.extraBase = data.extraBase;
-        }
-        if (Array.isArray(data.points3)) {
-          state.points = data.points3.slice(0,3).map(p3 => ({ p3 }));
-        }
+        if (Array.isArray(data.anchors) && data.anchors.length === 4) state.anchors = data.anchors.map(([x,y]) => ({x,y}));
+        if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) state.extraBase = data.extraBase;
+        if (Array.isArray(data.points3)) state.points = data.points3.slice(0,3).map(p3 => ({ p3 }));
       }
     }
   } catch (_) {}
 
-  // ---------- Проекция и сечение ----------
+  // ---------- 5. Расчёт сечения и следов ----------
   function getBasis() {
     const [A, B, C, T] = state.anchors;
-    return {
-      O: A,
-      e1: { x: B.x - A.x, y: B.y - A.y },
-      e2: { x: C.x - A.x, y: C.y - A.y },
-      e3: { x: T.x - A.x, y: T.y - A.y }
-    };
+    return { O: A, e1: {x: B.x-A.x, y: B.y-A.y}, e2: {x: C.x-A.x, y: C.y-A.y}, e3: {x: T.x-A.x, y: T.y-A.y} };
   }
 
   function proj2D(p3, basis) {
@@ -341,8 +629,7 @@
   }
 
   function isPointOnFace(p3, face, geom) {
-    const v0 = geom.v3[face.verts[0]];
-    return Math.abs(dot(face.normal, sub(p3, v0))) < 1e-4;
+    return Math.abs(dot(face.normal, sub(p3, geom.v3[face.verts[0]]))) < 1e-4;
   }
 
   function facesContaining(p3, geom) {
@@ -359,13 +646,13 @@
     );
 
     if (state.points.length < 3) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: [] };
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], traceNodes: [], steps: [] };
     }
 
     const [P1, P2, P3] = state.points.map(p => p.p3);
     const N = cross(sub(P2, P1), sub(P3, P1));
     if (norm(N) < 1e-6) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: ['⚠️ Точки лежат на одной прямой — сдвинь одну из точек.'] };
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], traceNodes: [], steps: ['ERR: Точки лежат на одной прямой — сдвиньте одну из точек.'] };
     }
 
     const planeVal = p => dot(N, sub(p, P1));
@@ -376,16 +663,13 @@
       if (Math.abs(di) < EPS && Math.abs(dj) < EPS) rawPts.push(Vi, Vj);
       else if (Math.abs(di) < EPS) rawPts.push(Vi);
       else if (Math.abs(dj) < EPS) rawPts.push(Vj);
-      else if (di * dj < 0) {
-        const t = di / (di - dj);
-        rawPts.push(add(Vi, mul(sub(Vj, Vi), t)));
-      }
+      else if (di * dj < 0) rawPts.push(add(Vi, mul(sub(Vj, Vi), di / (di - dj))));
     }
 
     const uniq = [];
     for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1e-4)) uniq.push(p);
     if (uniq.length < 3) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], steps: ['Плоскость не даёт сечения внутри фигуры.'] };
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], traces: [], traceNodes: [], steps: ['EMPTY: Плоскость не даёт сечения внутри фигуры.'] };
     }
 
     let center = [0,0,0];
@@ -403,20 +687,19 @@
       return geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(mid, f, geom));
     });
 
-    const { traces, steps } = buildTraceExplanation(geom, uniq, state.points);
-    return { geom, basis, faceVisible, edgeVisible, poly: uniq, segVis, traces, steps };
+    const { traces, traceNodes, steps } = buildTraceExplanation(geom, uniq, state.points);
+    return { geom, basis, faceVisible, edgeVisible, poly: uniq, segVis, traces, traceNodes, steps };
   }
 
   function intersectLines3D(p1, d1, p2, d2) {
     const c = cross(d1, d2);
     const denom = dot(c, c);
     if (denom < 1e-7) return null;
-    const t = dot(cross(sub(p2, p1), d2), c) / denom;
-    return add(p1, mul(d1, t));
+    return add(p1, mul(d1, dot(cross(sub(p2, p1), d2), c) / denom));
   }
 
   function buildTraceExplanation(geom, poly, givenPts) {
-    const steps = [], traces = [];
+    const steps = [], traces = [], traceNodes = [];
     const pts = givenPts.map((g, i) => ({ p3: g.p3, name: PT_NAMES[i], faces: facesContaining(g.p3, geom) }));
     const knownSegs = [], faceHasLine = new Set();
 
@@ -427,7 +710,7 @@
           const fi = common[0];
           faceHasLine.add(fi);
           knownSegs.push({ a: pts[i].p3, b: pts[j].p3, nameA: pts[i].name, nameB: pts[j].name, fi });
-          steps.push(`Точки <b>${pts[i].name}</b> и <b>${pts[j].name}</b> лежат в одной грани <b>${geom.faces[fi].name}</b> — соединяем отрезком.`);
+          steps.push(`Точки <b>${pts[i].name}</b>, <b>${pts[j].name}</b> в грани <b>${geom.faces[fi].name}</b> → отрезок ${pts[i].name}${pts[j].name}.`);
         }
       }
     }
@@ -444,7 +727,7 @@
               faceHasLine.add(fj);
               const onF = poly.filter(p => isPointOnFace(p, geom.faces[fj], geom));
               if (onF.length >= 2) knownSegs.push({ a: onF[0], b: onF[1], nameA: pInF2.name, nameB: '…', fi: fj });
-              steps.push(`Грани <b>${geom.faces[seg.fi].name}</b> и <b>${geom.faces[fj].name}</b> параллельны — проводим через <b>${pInF2.name}</b> прямую, параллельную <b>${seg.nameA}${seg.nameB}</b>.`);
+              steps.push(`<b>${geom.faces[seg.fi].name}</b> ∥ <b>${geom.faces[fj].name}</b> → через <b>${pInF2.name}</b> проводим прямую ∥ ${seg.nameA}${seg.nameB}.`);
             }
           }
         }
@@ -473,9 +756,10 @@
               [dist3(T, Vu) < dist3(T, Vv) ? Vu : Vv, T],
               [T, targetPt.p3]
             );
-            steps.push(`<b>Метод следов:</b> продлеваем <b>${seg.nameA}${seg.nameB}</b> до пересечения с продолжением ребра <b>${geom.labels[u]}${geom.labels[v]}</b> в точке <b>${tName}</b> и соединяем с <b>${targetPt.name}</b> в грани <b>${geom.faces[f2Idx].name}</b>.`);
+            traceNodes.push({ pt: T, label: tName });
+            steps.push(`<b>СЛЕД ${tName}:</b> ${seg.nameA}${seg.nameB} ∩ ${geom.labels[u]}${geom.labels[v]} = ${tName} → соединяем с <b>${targetPt.name}</b> в грани <b>${geom.faces[f2Idx].name}</b>.`);
           } else {
-            steps.push(`Прямая <b>${seg.nameA}${seg.nameB}</b> пересекает ребро <b>${geom.labels[u]}${geom.labels[v]}</b> в точке <b>${tName}</b> — соединяем с <b>${targetPt.name}</b>.`);
+            steps.push(`${seg.nameA}${seg.nameB} ∩ ребро ${geom.labels[u]}${geom.labels[v]} = <b>${tName}</b> → соединяем с <b>${targetPt.name}</b>.`);
           }
           faceHasLine.add(f2Idx);
           const onF2 = poly.filter(p => isPointOnFace(p, geom.faces[f2Idx], geom));
@@ -488,11 +772,11 @@
       if (!addedTrace) break;
     }
 
-    steps.push(`Замыкаем сечение — получаем <b>${poly.length}-угольник</b>.`);
-    return { traces, steps };
+    steps.push(`Контур замкнут: в сечении <b>${poly.length}-угольник</b>.`);
+    return { traces, traceNodes, steps };
   }
 
-  // ---------- Прилипание к рёбрам / вершинам / граням ----------
+  // ---------- 6. Привязка ----------
   function findSnap3D(mx, my) {
     const geom = buildShapeGeom(state.shapeKey, state.extraBase);
     const basis = getBasis();
@@ -503,7 +787,7 @@
 
     for (let i = 0; i < v2.length; i++) {
       if (Math.hypot(px(v2[i].x) - mPx, py(v2[i].y) - mPy) < 17) {
-        return { p3: [...geom.v3[i]], x2: v2[i].x, y2: v2[i].y };
+        return { p3: [...geom.v3[i]], x2: v2[i].x, y2: v2[i].y, tag: geom.labels[i] };
       }
     }
 
@@ -519,7 +803,7 @@
         const snappedT = Math.abs(t - 0.5) < 0.045 ? 0.5 : t;
         const p3 = add(geom.v3[i], mul(sub(geom.v3[j], geom.v3[i]), snappedT));
         const p2 = proj2D(p3, basis);
-        bestEdge = { p3, x2: p2.x, y2: p2.y };
+        bestEdge = { p3, x2: p2.x, y2: p2.y, tag: snappedT === 0.5 ? '1/2' : `${geom.labels[i]}${geom.labels[j]}` };
       }
     }
     if (bestEdge) return bestEdge;
@@ -536,150 +820,232 @@
         [basis.e1.y, basis.e2.y, basis.e3.y],
         [f.normal[0], f.normal[1], f.normal[2]]
       ], [mx - basis.O.x, my - basis.O.y, dF]);
-      if (p3) return { p3, x2: mx, y2: my };
+      if (p3) return { p3, x2: mx, y2: my, tag: f.name };
     }
     return null;
   }
 
-  // ---------- Рендер ----------
+  // ---------- 7. Рендер строго Black & Green ----------
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
-  function drawLabel(c, text, x, y, color, halo, scale) {
+  function drawLabel(c, text, x, y, color, scale, size = 12.5) {
     c.save();
-    c.font = `700 ${14*scale}px sans-serif`;
-    c.lineWidth = 3.5 * scale;
-    c.strokeStyle = halo;
+    c.font = `700 ${size*scale}px "JetBrains Mono", monospace`;
+    c.lineWidth = 4 * scale;
+    c.lineJoin = 'round';
+    c.strokeStyle = '#000000';
     c.strokeText(text, x, y);
     c.fillStyle = color;
     c.fillText(text, x, y);
     c.restore();
   }
 
+  function drawBracketReticle(c, x, y, r, color, scale) {
+    const b = r * 0.48;
+    c.save();
+    // Чёрный контур для читаемости на белом фото
+    c.strokeStyle = '#000000';
+    c.lineWidth = 4.2 * scale;
+    c.beginPath();
+    c.moveTo(x - r, y - r + b); c.lineTo(x - r, y - r); c.lineTo(x - r + b, y - r);
+    c.moveTo(x + r - b, y - r); c.lineTo(x + r, y - r); c.lineTo(x + r, y - r + b);
+    c.moveTo(x + r, y + r - b); c.lineTo(x + r, y + r); c.lineTo(x + r - b, y + r);
+    c.moveTo(x - r + b, y + r); c.lineTo(x - r, y + r); c.lineTo(x - r, y + r - b);
+    c.stroke();
+
+    c.strokeStyle = color;
+    c.lineWidth = 1.9 * scale;
+    c.stroke();
+
+    c.fillStyle = '#000000';
+    c.fillRect(x - 3*scale, y - 3*scale, 6*scale, 6*scale);
+    c.fillStyle = color;
+    c.fillRect(x - 1.8*scale, y - 1.8*scale, 3.6*scale, 3.6*scale);
+    c.restore();
+  }
+
   function renderToContext(targetCtx, w, h, isExport = false) {
     targetCtx.clearRect(0, 0, w, h);
+
     if (state.img) {
       targetCtx.drawImage(state.img, 0, 0, w, h);
+      if (document.getElementById('greenFilterCb').checked) {
+        targetCtx.save();
+        targetCtx.globalCompositeOperation = 'multiply';
+        targetCtx.fillStyle = '#00FF41';
+        targetCtx.fillRect(0, 0, w, h);
+        targetCtx.globalCompositeOperation = 'source-over';
+        targetCtx.fillStyle = 'rgba(0, 14, 3, 0.34)';
+        targetCtx.fillRect(0, 0, w, h);
+        targetCtx.restore();
+      }
     } else {
-      targetCtx.fillStyle = '#ffffff';
-      targetCtx.fillRect(0, 0, w, h);
-      targetCtx.strokeStyle = '#e2e8f0';
+      if (isExport) {
+        targetCtx.fillStyle = '#000000';
+        targetCtx.fillRect(0, 0, w, h);
+      }
+      // Тонкая фосфорная сетка
+      const step = 28 * Math.max(1, w / 840);
+      targetCtx.save();
+      targetCtx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
       targetCtx.lineWidth = 1;
-      for (let gx = 40; gx < w; gx += 40) { targetCtx.beginPath(); targetCtx.moveTo(gx,0); targetCtx.lineTo(gx,h); targetCtx.stroke(); }
-      for (let gy = 40; gy < h; gy += 40) { targetCtx.beginPath(); targetCtx.moveTo(0,gy); targetCtx.lineTo(w,gy); targetCtx.stroke(); }
+      targetCtx.beginPath();
+      for (let gx = step; gx < w; gx += step) { targetCtx.moveTo(gx, 0); targetCtx.lineTo(gx, h); }
+      for (let gy = step; gy < h; gy += step) { targetCtx.moveTo(0, gy); targetCtx.lineTo(w, gy); }
+      targetCtx.stroke();
+      targetCtx.restore();
     }
 
     const res = computeSection();
-    const { geom, basis, edgeVisible, poly, segVis, traces } = res;
+    const { geom, basis, edgeVisible, poly, segVis, traces, traceNodes } = res;
     const X = p => p.x * w, Y = p => p.y * h;
     const scale = Math.max(1, w / 650);
     const hideWire = document.getElementById('hideWireCb').checked;
     const showTrace = document.getElementById('showTraceCb').checked;
+    const showHatch = document.getElementById('showHatchCb').checked;
+    const showLabels = document.getElementById('showLabelsCb').checked;
     const v2 = geom.v3.map(v => proj2D(v, basis));
+    const hasPhoto = Boolean(state.img);
 
+    // 1. Рёбра каркаса (с чёрной подложкой поверх фото для идеального контраста)
     if (!hideWire) {
       geom.edges.forEach(([i, j], idx) => {
         targetCtx.save();
         targetCtx.beginPath();
         targetCtx.moveTo(X(v2[i]), Y(v2[i]));
         targetCtx.lineTo(X(v2[j]), Y(v2[j]));
-        targetCtx.lineWidth = (state.img ? 2.2 : 2) * scale;
-        if (edgeVisible[idx]) {
-          targetCtx.strokeStyle = state.img ? 'rgba(56, 189, 248, 0.72)' : '#1e293b';
-        } else {
-          targetCtx.strokeStyle = state.img ? 'rgba(56, 189, 248, 0.45)' : '#64748b';
-          targetCtx.setLineDash([6*scale, 5*scale]);
+        if (!edgeVisible[idx]) targetCtx.setLineDash([5*scale, 5*scale]);
+        if (hasPhoto) {
+          targetCtx.lineWidth = (edgeVisible[idx] ? 3.4 : 2.6) * scale;
+          targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+          targetCtx.stroke();
         }
+        targetCtx.lineWidth = (edgeVisible[idx] ? 1.75 : 1.25) * scale;
+        targetCtx.strokeStyle = edgeVisible[idx] ? '#00C832' : '#006B1B';
         targetCtx.stroke();
         targetCtx.restore();
       });
 
-      geom.v3.forEach((_, i) => {
-        drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#0f172a', '#ffffff', scale);
-      });
+      if (showLabels) {
+        geom.v3.forEach((_, i) => {
+          drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#9CFFAE', scale, 12);
+        });
+      }
     }
 
+    // 2. Линии метода следов
     if (showTrace && traces.length > 0) {
       targetCtx.save();
-      targetCtx.strokeStyle = '#f97316';
-      targetCtx.lineWidth = 2 * scale;
-      targetCtx.setLineDash([5*scale, 4*scale]);
+      targetCtx.setLineDash([3*scale, 4*scale]);
       for (const [a3, b3] of traces) {
         const a2 = proj2D(a3, basis), b2 = proj2D(b3, basis);
         targetCtx.beginPath();
         targetCtx.moveTo(X(a2), Y(a2));
         targetCtx.lineTo(X(b2), Y(b2));
+        if (hasPhoto) {
+          targetCtx.lineWidth = 3.2 * scale;
+          targetCtx.strokeStyle = 'rgba(0,0,0,0.8)';
+          targetCtx.stroke();
+        }
+        targetCtx.lineWidth = 1.6 * scale;
+        targetCtx.strokeStyle = '#00FF41';
         targetCtx.stroke();
+      }
+      targetCtx.setLineDash([]);
+      for (const tn of traceNodes) {
+        const p2 = proj2D(tn.pt, basis);
+        const tx = X(p2), ty = Y(p2), cs = 4.5 * scale;
+        targetCtx.beginPath();
+        targetCtx.moveTo(tx - cs, ty - cs); targetCtx.lineTo(tx + cs, ty + cs);
+        targetCtx.moveTo(tx + cs, ty - cs); targetCtx.lineTo(tx - cs, ty + cs);
+        targetCtx.lineWidth = 3.5 * scale; targetCtx.strokeStyle = '#000000'; targetCtx.stroke();
+        targetCtx.lineWidth = 1.6 * scale; targetCtx.strokeStyle = '#9CFFAE'; targetCtx.stroke();
+        drawLabel(targetCtx, tn.label, tx + 7*scale, ty - 6*scale, '#9CFFAE', scale, 11);
       }
       targetCtx.restore();
     }
 
+    // 3. Многоугольник сечения + 45° зелёная штриховка
     if (poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
       targetCtx.beginPath();
       poly2.forEach((p, i) => i === 0 ? targetCtx.moveTo(X(p), Y(p)) : targetCtx.lineTo(X(p), Y(p)));
       targetCtx.closePath();
-      targetCtx.fillStyle = 'rgba(239, 68, 68, 0.28)';
+      targetCtx.fillStyle = 'rgba(0, 255, 65, 0.14)';
       targetCtx.fill();
+
+      if (showHatch) {
+        targetCtx.save();
+        targetCtx.clip();
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        poly2.forEach(p => {
+          const px = X(p), py = Y(p);
+          if (px < minX) minX = px; if (px > maxX) maxX = px;
+          if (py < minY) minY = py; if (py > maxY) maxY = py;
+        });
+        const step = 11 * scale, diag = maxY - minY;
+        targetCtx.beginPath();
+        for (let sx = minX - diag; sx <= maxX + step; sx += step) {
+          targetCtx.moveTo(sx, maxY);
+          targetCtx.lineTo(sx + diag, minY);
+        }
+        targetCtx.lineWidth = 1.2 * scale;
+        targetCtx.strokeStyle = 'rgba(0, 255, 65, 0.36)';
+        targetCtx.stroke();
+        targetCtx.restore();
+      }
 
       poly2.forEach((a, i) => {
         const b = poly2[(i + 1) % poly2.length];
         targetCtx.beginPath();
         targetCtx.moveTo(X(a), Y(a));
         targetCtx.lineTo(X(b), Y(b));
-        targetCtx.lineWidth = 3.2 * scale;
-        targetCtx.strokeStyle = '#dc2626';
-        targetCtx.setLineDash(segVis[i] ? [] : [7*scale, 5*scale]);
+        targetCtx.setLineDash(segVis[i] ? [] : [7*scale, 4.5*scale]);
+        if (hasPhoto) {
+          targetCtx.lineWidth = 4.6 * scale;
+          targetCtx.strokeStyle = '#000000';
+          targetCtx.stroke();
+        }
+        targetCtx.lineWidth = 2.6 * scale;
+        targetCtx.strokeStyle = '#00FF41';
         targetCtx.stroke();
       });
       targetCtx.restore();
     }
 
+    // 4. Точки M, N, P
     state.points.forEach((pt, idx) => {
       const p2 = proj2D(pt.p3, basis);
-      targetCtx.beginPath();
-      targetCtx.arc(X(p2), Y(p2), 6*scale, 0, Math.PI*2);
-      targetCtx.fillStyle = '#ef4444';
-      targetCtx.fill();
-      targetCtx.lineWidth = 2*scale;
-      targetCtx.strokeStyle = '#ffffff';
-      targetCtx.stroke();
-      drawLabel(targetCtx, PT_NAMES[idx], X(p2) + 8*scale, Y(p2) - 8*scale, '#dc2626', '#ffffff', scale);
+      const px = X(p2), py = Y(p2);
+      targetCtx.save();
+      targetCtx.fillStyle = '#000000';
+      targetCtx.fillRect(px - 5.5*scale, py - 5.5*scale, 11*scale, 11*scale);
+      targetCtx.fillStyle = '#00FF41';
+      targetCtx.fillRect(px - 3.5*scale, py - 3.5*scale, 7*scale, 7*scale);
+      targetCtx.restore();
+      drawLabel(targetCtx, PT_NAMES[idx], px + 8*scale, py - 8*scale, '#00FF41', scale, 13.5);
     });
 
+    // 5. Прицелы вершин
     if (!isExport && state.mode === 'anchors') {
-      // Основные 4 зелёные ручки
       state.anchors.forEach((a, idx) => {
         const vIdx = geom.anchors[idx];
-        targetCtx.beginPath();
-        targetCtx.arc(X(a), Y(a), 10*scale, 0, Math.PI*2);
-        targetCtx.fillStyle = 'rgba(34, 197, 94, 0.92)';
-        targetCtx.fill();
-        targetCtx.lineWidth = 2.5*scale;
-        targetCtx.strokeStyle = '#ffffff';
-        targetCtx.stroke();
-        drawLabel(targetCtx, geom.labels[vIdx], X(a) - 18*scale, Y(a) - 10*scale, '#15803d', '#ffffff', scale);
+        drawBracketReticle(targetCtx, X(a), Y(a), 10 * scale, '#00FF41', scale);
+        drawLabel(targetCtx, geom.labels[vIdx], X(a) - 18*scale, Y(a) - 10*scale, '#00FF41', scale, 12);
       });
-      // Дополнительные голубые ручки основания (D, E, F) для произвольных 4/5/6-угольников
       geom.extraIndices.forEach((vIdx) => {
         const p2 = v2[vIdx];
-        targetCtx.beginPath();
-        targetCtx.arc(X(p2), Y(p2), 8.5*scale, 0, Math.PI*2);
-        targetCtx.fillStyle = 'rgba(6, 182, 212, 0.92)';
-        targetCtx.fill();
-        targetCtx.lineWidth = 2*scale;
-        targetCtx.strokeStyle = '#ffffff';
-        targetCtx.stroke();
+        drawBracketReticle(targetCtx, X(p2), Y(p2), 8 * scale, '#00A82B', scale);
       });
     }
 
+    // 6. Прицел наведения
     if (!isExport && state.snapPreview && state.mode === 'points') {
-      targetCtx.beginPath();
-      targetCtx.arc(state.snapPreview.x2 * w, state.snapPreview.y2 * h, 8*scale, 0, Math.PI*2);
-      targetCtx.strokeStyle = '#facc15';
-      targetCtx.lineWidth = 2.5*scale;
-      targetCtx.stroke();
+      const sp = state.snapPreview;
+      drawBracketReticle(targetCtx, sp.x2 * w, sp.y2 * h, 8.5 * scale, '#9CFFAE', scale);
+      if (sp.tag) drawLabel(targetCtx, sp.tag, sp.x2 * w + 12*scale, sp.y2 * h + 14*scale, '#9CFFAE', scale, 11);
     }
 
     return res;
@@ -690,34 +1056,50 @@
     canvas.height = state.imgH;
     const res = renderToContext(ctx, state.imgW, state.imgH, false);
 
+    // Оптическая CRT-лупа при перетаскивании
     if (state.dragging && state.pointerPos) {
-      const r = Math.min(state.imgW, state.imgH) * 0.14;
+      const s = Math.min(state.imgW, state.imgH) * 0.25;
       const mx = state.pointerPos.x * state.imgW, my = state.pointerPos.y * state.imgH;
-      const lx = mx < state.imgW * 0.5 ? state.imgW - r - 14 : r + 14, ly = r + 14;
+      const lx = mx < state.imgW * 0.5 ? state.imgW - s - 10 : 10, ly = 10;
       ctx.save();
-      ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.clip();
-      ctx.fillStyle = '#0f172a'; ctx.fillRect(lx - r, ly - r, r*2, r*2);
-      ctx.drawImage(canvas, mx - r*0.45, my - r*0.45, r*0.9, r*0.9, lx - r, ly - r, r*2, r*2);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(lx, ly, s, s);
+      ctx.beginPath(); ctx.rect(lx, ly, s, s); ctx.clip();
+      ctx.drawImage(canvas, mx - s*0.25, my - s*0.25, s*0.5, s*0.5, lx, ly, s, s);
       ctx.restore();
-      ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2);
-      ctx.lineWidth = 3; ctx.strokeStyle = '#3b82f6'; ctx.stroke();
+
+      ctx.strokeStyle = '#00FF41';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(lx, ly, s, s);
+
       ctx.beginPath();
-      ctx.moveTo(lx - 10, ly); ctx.lineTo(lx + 10, ly);
-      ctx.moveTo(lx, ly - 10); ctx.lineTo(lx, ly + 10);
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.moveTo(lx + s/2 - 10, ly + s/2); ctx.lineTo(lx + s/2 + 10, ly + s/2);
+      ctx.moveTo(lx + s/2, ly + s/2 - 10); ctx.lineTo(lx + s/2, ly + s/2 + 10);
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(lx + 2, ly + s - 16, 98, 14);
+      ctx.fillStyle = '#00FF41';
+      ctx.font = '700 10px "JetBrains Mono", monospace';
+      ctx.fillText(`X:${state.pointerPos.x.toFixed(2)} Y:${state.pointerPos.y.toFixed(2)}`, lx + 5, ly + s - 5);
     }
 
-    document.getElementById('modePointsBtn').textContent = `2️⃣ Точки (${state.points.length}/3)`;
+    document.getElementById('modePointsBtn').textContent = `02 // ТОЧКИ [${state.points.length}/3]`;
+    const polyKind = res.poly.length >= 3 ? `${res.poly.length}-УГ.` : `ТОЧЕК ${state.points.length}/3`;
+    document.getElementById('hudStatus').textContent = (state.mode === 'anchors' ? 'КАРКАС · ' : 'СЕЧЕНИЕ · ') + polyKind;
+    document.getElementById('polyKindTag').textContent = res.poly.length >= 3 ? `[ ${res.poly.length}-УГОЛЬНИК ]` : '[ ОЖИДАНИЕ ]';
+
     const list = document.getElementById('stepsList');
     list.innerHTML = res.steps.length > 0
-      ? res.steps.map(s => `<li>${s}</li>`).join('')
-      : '<li>Поставь 3 точки на рёбрах или гранях фигуры.</li>';
+      ? res.steps.map((s, i) => `<li><span class="trace-idx">${String(i+1).padStart(2,'0')}&gt;</span><span>${s}</span></li>`).join('')
+      : '<li><span class="trace-idx">01&gt;</span><span>Переключитесь на «02 // ТОЧКИ» и отметьте 3 точки M, N, P на рёбрах или гранях.</span></li>';
 
     const sendBtn = document.getElementById('sendTgBtn');
-    if (tg && tg.initData && state.points.length === 3) sendBtn.style.display = 'inline-block';
+    if (tg && tg.initData && state.points.length === 3) sendBtn.style.display = 'inline-flex';
   }
 
-  // ---------- Ввод ----------
+  // ---------- 8. События ввода ----------
   function getNormPos(e) {
     const rect = canvas.getBoundingClientRect();
     const cx = e.touches ? e.touches[0].clientX : e.clientX;
@@ -796,7 +1178,13 @@
     draw();
   });
 
-  // ---------- Кнопки ----------
+  document.getElementById('shapeBar').addEventListener('click', (e) => {
+    const card = e.target.closest('.shape-slot');
+    if (!card) return;
+    applyShapeDefaults(card.dataset.shape);
+    draw();
+  });
+
   document.getElementById('fileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -808,6 +1196,9 @@
         const k = img.width > 1200 ? 1200 / img.width : 1;
         state.imgW = Math.round(img.width * k);
         state.imgH = Math.round(img.height * k);
+        rainCanvas.style.display = 'none';
+        document.getElementById('clearPhotoBtn').style.display = 'inline-flex';
+        document.getElementById('greenFilterWrap').style.display = 'inline-flex';
         draw();
       };
       img.src = ev.target.result;
@@ -815,20 +1206,24 @@
     reader.readAsDataURL(file);
   });
 
-  document.getElementById('shapeSelect').addEventListener('change', (e) => {
-    applyShapeDefaults(e.target.value);
+  document.getElementById('clearPhotoBtn').addEventListener('click', () => {
+    state.img = null;
+    state.imgW = 840;
+    state.imgH = 580;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('clearPhotoBtn').style.display = 'none';
+    document.getElementById('greenFilterWrap').style.display = 'none';
+    rainCanvas.style.display = 'block';
+    requestAnimationFrame(tickRain);
     draw();
   });
 
+  document.getElementById('flipBtn').addEventListener('click', () => { state.flipDepth = !state.flipDepth; draw(); });
+
   document.getElementById('resetRegBtn').addEventListener('click', () => {
     const N = SHAPE_META[state.shapeKey].N;
-    if (N > 3) {
-      state.extraBase = computeRegularExtraBase(N);
-      draw();
-    }
+    if (N > 3) { state.extraBase = computeRegularExtraBase(N); draw(); }
   });
-
-  document.getElementById('flipBtn').addEventListener('click', () => { state.flipDepth = !state.flipDepth; draw(); });
 
   function setMode(m) {
     state.mode = m;
@@ -836,9 +1231,6 @@
     document.getElementById('modePointsBtn').classList.toggle('active', m === 'points');
     document.getElementById('anchorControls').style.display = m === 'anchors' ? 'flex' : 'none';
     document.getElementById('pointControls').style.display = m === 'points' ? 'flex' : 'none';
-    document.getElementById('hintBar').innerHTML = m === 'anchors'
-      ? 'Перетащи <b>4 зелёных угла</b> на вершины фигуры. Для трапеции/произвольного основания поправь <b>голубые углы</b>.'
-      : 'Кликай на <b>рёбра, середины или грани</b>, чтобы поставить 3 точки (<b>M, N, P</b>). Точки можно двигать.';
     draw();
   }
 
@@ -846,20 +1238,22 @@
   document.getElementById('modePointsBtn').addEventListener('click', () => setMode('points'));
   document.getElementById('faceSideBtn').addEventListener('click', (e) => {
     state.preferBackFace = !state.preferBackFace;
-    e.target.textContent = state.preferBackFace ? 'Грань: Задняя' : 'Грань: Передняя';
+    e.target.textContent = state.preferBackFace ? 'ГРАНЬ: ЗАД' : 'ГРАНЬ: ПЕРЕД';
   });
   document.getElementById('undoPointBtn').addEventListener('click', () => { state.points.pop(); draw(); });
   document.getElementById('clearPointsBtn').addEventListener('click', () => { state.points = []; draw(); });
-  document.getElementById('showTraceCb').addEventListener('change', draw);
-  document.getElementById('hideWireCb').addEventListener('change', draw);
+
+  ['showHatchCb', 'showTraceCb', 'showLabelsCb', 'hideWireCb', 'greenFilterCb'].forEach(id =>
+    document.getElementById(id).addEventListener('change', draw)
+  );
 
   document.getElementById('downloadBtn').addEventListener('click', () => {
     const out = document.createElement('canvas');
-    out.width = state.img ? state.img.naturalWidth : 1200;
-    out.height = state.img ? state.img.naturalHeight : 900;
+    out.width = state.img ? state.img.naturalWidth : 1400;
+    out.height = state.img ? state.img.naturalHeight : 960;
     renderToContext(out.getContext('2d'), out.width, out.height, true);
     const link = document.createElement('a');
-    link.download = 'section.png';
+    link.download = 'sechenie_matrix.png';
     link.href = out.toDataURL('image/png');
     link.click();
   });
@@ -874,7 +1268,10 @@
     }));
   });
 
+  window.addEventListener('resize', () => { if (!state.img) initRain(); });
   draw();
+  initRain();
+  requestAnimationFrame(tickRain);
 })();
 </script>
 </body>
