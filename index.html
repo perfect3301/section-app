@@ -47,9 +47,10 @@
     .t-btn.dim { color: var(--g-mid); border-color: var(--g-dim); }
     .t-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
-    .shape-bar { display: grid; grid-template-columns: repeat(6, minmax(54px, 1fr)); gap: 4px; overflow-x: auto; scrollbar-width: none; }
+    .shape-bar { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
     .shape-bar::-webkit-scrollbar { display: none; }
     .shape-slot {
+      flex: 1 0 64px;
       display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
       padding: 6px 2px; background: var(--bg-panel); border: 1px solid var(--g-dim); color: var(--g-mid);
       font-family: inherit; font-size: 10px; font-weight: 700; cursor: pointer;
@@ -126,6 +127,22 @@
       <svg viewBox="0 0 24 24"><polygon points="4,8 15,8 15,19 4,19"/><polyline points="4,8 9,4 20,4 15,8"/><polyline points="20,4 20,15 15,19"/></svg>
       <span>КУБ</span>
     </button>
+    <button class="shape-slot" data-shape="quad_prism">
+      <svg viewBox="0 0 24 24"><polygon points="6,9 15,9 14,19 5,19"/><polyline points="6,9 3,4 21,4 15,9"/><polyline points="21,4 19,14 14,19"/><polyline points="3,4 2,14 5,19"/><line x1="2" y1="14" x2="19" y2="14" stroke-dasharray="2 2"/></svg>
+      <span>ПРЗ-4</span>
+    </button>
+    <button class="shape-slot" data-shape="tri_prism">
+      <svg viewBox="0 0 24 24"><polygon points="5,8 12,4 19,8"/><polygon points="5,18 12,21 19,18"/><line x1="5" y1="8" x2="5" y2="18"/><line x1="12" y1="4" x2="12" y2="21"/><line x1="19" y1="8" x2="19" y2="18"/></svg>
+      <span>ПРЗ-3</span>
+    </button>
+    <button class="shape-slot" data-shape="penta_prism">
+      <svg viewBox="0 0 24 24"><polygon points="4,6 12,3 20,6 17,9 7,9"/><polyline points="4,6 4,17 7,20 17,20 20,17 20,6"/><line x1="7" y1="9" x2="7" y2="20"/><line x1="17" y1="9" x2="17" y2="20"/></svg>
+      <span>ПРЗ-5</span>
+    </button>
+    <button class="shape-slot" data-shape="hex_prism">
+      <svg viewBox="0 0 24 24"><polygon points="4,6 9,3 15,3 20,6 15,9 9,9"/><polyline points="4,6 4,17 9,20 15,20 20,17 20,6"/><line x1="9" y1="9" x2="9" y2="20"/><line x1="15" y1="9" x2="15" y2="20"/></svg>
+      <span>ПРЗ-6</span>
+    </button>
     <button class="shape-slot" data-shape="tetrahedron">
       <svg viewBox="0 0 24 24"><polygon points="12,3 4,18 20,17"/><line x1="12" y1="3" x2="11" y2="20"/><line x1="4" y1="18" x2="11" y2="20"/><line x1="20" y1="17" x2="11" y2="20"/></svg>
       <span>ПИР-3</span>
@@ -141,10 +158,6 @@
     <button class="shape-slot" data-shape="hex_pyramid">
       <svg viewBox="0 0 24 24"><polygon points="12,3 3,15 8,20 16,20 21,15"/><line x1="12" y1="3" x2="8" y2="20"/><line x1="12" y1="3" x2="16" y2="20"/><polyline points="3,15 8,12 16,12 21,15" stroke-dasharray="2 2"/></svg>
       <span>ПИР-6</span>
-    </button>
-    <button class="shape-slot" data-shape="tri_prism">
-      <svg viewBox="0 0 24 24"><polygon points="5,8 12,4 19,8"/><polygon points="5,18 12,21 19,18"/><line x1="5" y1="8" x2="5" y2="18"/><line x1="12" y1="4" x2="12" y2="21"/><line x1="19" y1="8" x2="19" y2="18"/></svg>
-      <span>ПРЗ-3</span>
     </button>
   </div>
 
@@ -282,7 +295,7 @@
     return inside;
   }
 
-  // ---------- 3. Фигуры ----------
+  // ---------- 3. Фигуры (синхронизировано с bot.py) ----------
   const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   function computeRegularExtraBase(N) {
@@ -296,47 +309,81 @@
   }
 
   const SHAPE_META = {
-    cube:          { title:'КУБ // PAR',    type:'prism',   defaultAnchors:[[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]] },
-    tetrahedron:   { title:'ПИР-3 // TETRA',type:'pyramid', N:3, defaultAnchors:[[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]] },
-    quad_pyramid:  { title:'ПИР-4 // QUAD', type:'pyramid', N:4, defaultAnchors:[[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]] },
-    penta_pyramid: { title:'ПИР-5 // PENTA',type:'pyramid', N:5, defaultAnchors:[[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]] },
-    hex_pyramid:   { title:'ПИР-6 // HEXA', type:'pyramid', N:6, defaultAnchors:[[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]] },
-    tri_prism:     { title:'ПРЗ-3 // PRISM',type:'prism',   defaultAnchors:[[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]] }
+    cube:          { title:'КУБ // PAR',      type:'prism',   N:4, hasExtra:false, defaultAnchors:[[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]] },
+    quad_prism:    { title:'ПРЗ-4 // PRISM',  type:'prism',   N:4, hasExtra:true,  defaultAnchors:[[0.25,0.80],[0.64,0.80],[0.78,0.58],[0.29,0.34]] },
+    tri_prism:     { title:'ПРЗ-3 // PRISM',  type:'prism',   N:3, hasExtra:false, defaultAnchors:[[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]] },
+    penta_prism:   { title:'ПРЗ-5 // PRISM',  type:'prism',   N:5, hasExtra:true,  defaultAnchors:[[0.24,0.75],[0.50,0.83],[0.76,0.75],[0.24,0.31]] },
+    hex_prism:     { title:'ПРЗ-6 // PRISM',  type:'prism',   N:6, hasExtra:true,  defaultAnchors:[[0.24,0.74],[0.43,0.83],[0.69,0.79],[0.24,0.30]] },
+    tetrahedron:   { title:'ПИР-3 // TETRA',  type:'pyramid', N:3, hasExtra:false, defaultAnchors:[[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]] },
+    quad_pyramid:  { title:'ПИР-4 // QUAD',   type:'pyramid', N:4, hasExtra:true,  defaultAnchors:[[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]] },
+    penta_pyramid: { title:'ПИР-5 // PENTA',  type:'pyramid', N:5, hasExtra:true,  defaultAnchors:[[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]] },
+    hex_pyramid:   { title:'ПИР-6 // HEXA',   type:'pyramid', N:6, hasExtra:true,  defaultAnchors:[[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]] }
   };
+
+  function enforceOutwardNormals(v3, faces) {
+    let center = [0,0,0];
+    v3.forEach(p => center = add(center, p));
+    center = mul(center, 1 / v3.length);
+    for (const f of faces) {
+      const va = v3[f.verts[0]], vb = v3[f.verts[1]], vc = v3[f.verts[2]];
+      let n = cross(sub(vb, va), sub(vc, va));
+      if (norm(n) < 1e-8 && f.verts.length >= 4) n = cross(sub(vb, va), sub(v3[f.verts[3]], va));
+      if (dot(n, sub(va, center)) < 0) n = mul(n, -1);
+      f.normal = n;
+    }
+    return faces;
+  }
 
   function buildShapeGeom(shapeKey, extraBase) {
     if (shapeKey === 'cube') {
+      const v3 = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+      const faces = enforceOutwardNormals(v3, [
+        { name:'ABCD', verts:[0,1,2,3] },
+        { name:'A₁B₁C₁D₁', verts:[4,5,6,7] },
+        { name:'ABB₁A₁', verts:[0,1,5,4] },
+        { name:'BCC₁B₁', verts:[1,2,6,5] },
+        { name:'CDD₁C₁', verts:[2,3,7,6] },
+        { name:'DAA₁D₁', verts:[3,0,4,7] }
+      ]);
       return {
         labels: ['A','B','C','D','A₁','B₁','C₁','D₁'],
-        v3: [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],
-        anchors: [0,1,3,4], extraIndices: [], isPyramid: false,
+        v3, anchors: [0,1,3,4], extraIndices: [], isPyramid: false, isPrism: true, nBase: 4,
         edges: [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]],
-        faces: [
-          { name:'ABCD', verts:[0,1,2,3], normal:[0,0,-1] },
-          { name:'A₁B₁C₁D₁', verts:[4,5,6,7], normal:[0,0,1] },
-          { name:'ABB₁A₁', verts:[0,1,5,4], normal:[0,-1,0] },
-          { name:'BCC₁B₁', verts:[1,2,6,5], normal:[1,0,0] },
-          { name:'CDD₁C₁', verts:[2,3,7,6], normal:[0,1,0] },
-          { name:'DAA₁D₁', verts:[3,0,4,7], normal:[-1,0,0] }
-        ]
+        faces
       };
     }
-    if (shapeKey === 'tri_prism') {
-      return {
-        labels: ['A','B','C','A₁','B₁','C₁'],
-        v3: [[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,0,1],[0,1,1]],
-        anchors: [0,1,2,3], extraIndices: [], isPyramid: false,
-        edges: [[0,1],[1,2],[2,0],[3,4],[4,5],[5,3],[0,3],[1,4],[2,5]],
-        faces: [
-          { name:'ABC', verts:[0,1,2], normal:[0,0,-1] },
-          { name:'A₁B₁C₁', verts:[3,4,5], normal:[0,0,1] },
-          { name:'ABB₁A₁', verts:[0,1,4,3], normal:[0,-1,0] },
-          { name:'ACC₁A₁', verts:[0,2,5,3], normal:[-1,0,0] },
-          { name:'BCC₁B₁', verts:[1,2,5,4], normal:[1,1,0] }
-        ]
-      };
+
+    const meta = SHAPE_META[shapeKey];
+    const N = meta.N;
+    if (meta.type === 'prism') {
+      const botLbls = BASE_LETTERS.slice(0, N);
+      const topLbls = botLbls.map(c => `${c}₁`);
+      const labels = [...botLbls, ...topLbls];
+      const basePts = [[0,0,0], [1,0,0], [0,1,0]];
+      const extraIndices = [];
+      for (let k = 3; k < N; k++) {
+        const xy = extraBase[k - 3] || [0, 0];
+        basePts.push([xy[0], xy[1], 0]);
+        extraIndices.push(k);
+      }
+      const v3 = [...basePts, ...basePts.map(p => [p[0], p[1], 1])];
+      const edges = [];
+      const faces = [
+        { name: botLbls.join(''), verts: Array.from({length: N}, (_, i) => i) },
+        { name: topLbls.join(''), verts: Array.from({length: N}, (_, i) => N + i) }
+      ];
+      for (let k = 0; k < N; k++) {
+        const kn = (k + 1) % N;
+        edges.push([k, kn], [N + k, N + kn], [k, N + k]);
+        faces.push({
+          name: `${botLbls[k]}${botLbls[kn]}${topLbls[kn]}${topLbls[k]}`,
+          verts: [k, kn, N + kn, N + k]
+        });
+      }
+      enforceOutwardNormals(v3, faces);
+      return { labels, v3, anchors: [0, 1, 2, N], extraIndices, isPyramid: false, isPrism: true, nBase: N, edges, faces };
     }
-    const N = SHAPE_META[shapeKey].N;
+
     const labels = [...BASE_LETTERS.slice(0, N), 'S'];
     const v3 = [[0,0,0], [1,0,0], [0,1,0]];
     const extraIndices = [];
@@ -346,19 +393,15 @@
       extraIndices.push(k);
     }
     v3.push([0, 0, 1]);
-    let center = [0,0,0];
-    v3.forEach(p => center = add(center, p));
-    center = mul(center, 1 / v3.length);
     const edges = [];
-    const faces = [{ name: BASE_LETTERS.slice(0, N).join(''), verts: Array.from({length: N}, (_, i) => i), normal: [0,0,-1] }];
+    const faces = [{ name: BASE_LETTERS.slice(0, N).join(''), verts: Array.from({length: N}, (_, i) => i) }];
     for (let k = 0; k < N; k++) {
       const kn = (k + 1) % N;
       edges.push([k, kn], [k, N]);
-      let n = cross(sub(v3[kn], v3[k]), sub(v3[N], v3[k]));
-      if (dot(n, sub(v3[k], center)) < 0) n = mul(n, -1);
-      faces.push({ name: `${labels[k]}${labels[kn]}S`, verts: [k, kn, N], normal: n });
+      faces.push({ name: `${labels[k]}${labels[kn]}S`, verts: [k, kn, N] });
     }
-    return { labels, v3, anchors: [0, 1, 2, N], extraIndices, isPyramid: true, edges, faces };
+    enforceOutwardNormals(v3, faces);
+    return { labels, v3, anchors: [0, 1, 2, N], extraIndices, isPyramid: true, isPrism: false, nBase: N, edges, faces };
   }
 
   // ---------- 4. Состояние ----------
@@ -377,16 +420,17 @@
     snapPreview: null
   };
 
-  function applyShapeDefaults(key) {
+  function applyShapeDefaults(key, resetNames = true) {
     state.shapeKey = key;
     const meta = SHAPE_META[key];
     state.anchors = meta.defaultAnchors.map(([x,y]) => ({x,y}));
-    state.extraBase = meta.type === 'pyramid' ? computeRegularExtraBase(meta.N) : [];
+    state.extraBase = meta.hasExtra ? computeRegularExtraBase(meta.N) : [];
     state.points = [];
+    if (resetNames) ptNames = ['M', 'N', 'P'];
     document.querySelectorAll('.shape-slot').forEach(el => el.classList.toggle('active', el.dataset.shape === key));
     document.getElementById('hudShape').textContent = meta.title;
-    document.getElementById('resetRegBtn').style.display = (meta.N && meta.N > 3) ? 'inline-flex' : 'none';
-    document.getElementById('anchorHint').textContent = (meta.N && meta.N > 3)
+    document.getElementById('resetRegBtn').style.display = meta.hasExtra ? 'inline-flex' : 'none';
+    document.getElementById('anchorHint').textContent = meta.hasExtra
       ? '> Яркие [+] опора, тусклые [+] основание'
       : '> Совместите 4 прицела [+] с углами фигуры';
   }
@@ -394,11 +438,16 @@
   try {
     const presetParam = new URLSearchParams(location.search).get('preset');
     if (presetParam) {
-      const b64 = presetParam.replace(/-/g, '+').replace(/_/g, '/');
+      let b64 = presetParam.replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
       const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(b64), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
       const data = JSON.parse(jsonStr);
       if (SHAPE_META[data.shape]) {
-        applyShapeDefaults(data.shape);
+        applyShapeDefaults(data.shape, false);
+        if (data.aspect && data.aspect > 0.2 && data.aspect < 5) {
+          state.imgW = 840;
+          state.imgH = Math.max(360, Math.min(1260, Math.round(840 / data.aspect)));
+        }
         if (Array.isArray(data.anchors) && data.anchors.length === 4) state.anchors = data.anchors.map(([x,y]) => ({x,y}));
         if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) state.extraBase = data.extraBase;
         if (Array.isArray(data.ptNames) && data.ptNames.length === 3) ptNames = data.ptNames;
@@ -428,7 +477,9 @@
   }
 
   function isPointOnFace(p3, face, geom) {
-    return Math.abs(dot(face.normal, sub(p3, geom.v3[face.verts[0]]))) < 1e-3;
+    const nLen = norm(face.normal);
+    if (nLen < 1e-8) return false;
+    return Math.abs(dot(face.normal, sub(p3, geom.v3[face.verts[0]]))) / nLen < 2e-3;
   }
 
   function intersectLines3D(p1, d1, p2, d2) {
@@ -439,20 +490,33 @@
   }
 
   function onSegment3D(p, a, b) {
-    return Math.abs(dist3(p, a) + dist3(p, b) - dist3(b, a)) < 1e-3;
+    return Math.abs(dist3(p, a) + dist3(p, b) - dist3(b, a)) < 2e-3;
+  }
+
+  function clipLineWithPoly3D(p0, d, verts3D) {
+    const hits = [];
+    for (let k = 0; k < verts3D.length; k++) {
+      const va = verts3D[k], vb = verts3D[(k + 1) % verts3D.length];
+      const q = intersectLines3D(p0, d, va, sub(vb, va));
+      if (q && onSegment3D(q, va, vb)) {
+        if (!hits.some(h => dist3(h, q) < 1.5e-3)) hits.push(q);
+      }
+    }
+    if (hits.length > 2) {
+      let bestPair = [hits[0], hits[1]], bestD = -1;
+      for (let i = 0; i < hits.length; i++) {
+        for (let j = i + 1; j < hits.length; j++) {
+          const dd = dist3(hits[i], hits[j]);
+          if (dd > bestD) { bestD = dd; bestPair = [hits[i], hits[j]]; }
+        }
+      }
+      return bestPair;
+    }
+    return hits;
   }
 
   function clipLineWithFace(p0, d, face, geom) {
-    const hits = [];
-    const verts = face.verts;
-    for (let k = 0; k < verts.length; k++) {
-      const va = geom.v3[verts[k]], vb = geom.v3[verts[(k + 1) % verts.length]];
-      const q = intersectLines3D(p0, d, va, sub(vb, va));
-      if (q && onSegment3D(q, va, vb)) {
-        if (!hits.some(h => dist3(h, q) < 1e-3)) hits.push(q);
-      }
-    }
-    return hits;
+    return clipLineWithPoly3D(p0, d, face.verts.map(vi => geom.v3[vi]));
   }
 
   function computeSection() {
@@ -486,7 +550,7 @@
     }
 
     const uniq = [];
-    for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1e-3)) uniq.push(p);
+    for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1.5e-3)) uniq.push(p);
     if (uniq.length < 3) {
       return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: ['EMPTY: Плоскость не даёт сечения внутри фигуры.'] };
     }
@@ -506,11 +570,11 @@
       return geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(mid, f, geom));
     });
 
-    const res = buildNotebookSteps(geom, faceVisible, state.points, uniq);
+    const res = buildNotebookSteps(geom, basis, faceVisible, state.points, uniq, N, P1);
     return { geom, basis, faceVisible, edgeVisible, poly: uniq, segVis, ...res };
   }
 
-  function buildNotebookSteps(geom, faceVisible, givenPts, poly) {
+  function buildNotebookSteps(geom, basis, faceVisible, givenPts, poly, nPlane, p1) {
     const knownPts = givenPts.map((g, i) => ({ p3: g.p3, name: ptNames[i] || `P${i+1}`, isUser: true }));
     const usedNames = new Set(knownPts.map(k => k.name));
     let xCounter = 1;
@@ -521,19 +585,73 @@
       }
     };
     const getOrAddPt = (p3) => {
-      for (const kp of knownPts) if (dist3(kp.p3, p3) < 1e-3) return kp;
+      for (const kp of knownPts) if (dist3(kp.p3, p3) < 2e-3) return kp;
       const kp = { p3, name: nextXName(), isUser: false };
       knownPts.push(kp);
       return kp;
     };
+    const nameIfExistingVertex = (p3) => {
+      for (let i = 0; i < geom.v3.length; i++) if (dist3(geom.v3[i], p3) < 2e-3) return geom.labels[i];
+      return null;
+    };
 
-    const faceLines = {}, traces = [], traceNodes = [], steps = [];
-    let didProj = false;
+    const v2All = geom.v3.map(v => proj2D(v, basis));
+    const visFacePolys = geom.faces
+      .filter((_, fi) => faceVisible[fi])
+      .map(f => f.verts.map(vi => v2All[vi]));
+
+    const isPtVisible = (p3) => {
+      if (geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(p3, f, geom))) return true;
+      const p2 = proj2D(p3, basis);
+      return !visFacePolys.some(poly2 => pointInPoly2D(p2.x, p2.y, poly2));
+    };
+
+    const isSegVisible = (pa, pb) => {
+      const mid = mul(add(pa, pb), 0.5);
+      if (geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(pa, f, geom) && isPointOnFace(pb, f, geom) && isPointOnFace(mid, f, geom))) {
+        return true;
+      }
+      const m2 = proj2D(mid, basis);
+      return !visFacePolys.some(poly2 => pointInPoly2D(m2.x, m2.y, poly2));
+    };
+
+    const traces = [];
+    const addRay = (pa, pb) => {
+      if (dist3(pa, pb) >= 2e-3) traces.push({ a: pa, b: pb, visible: isSegVisible(pa, pb) });
+    };
+
+    const inFrame = (p3) => {
+      const p2 = proj2D(p3, basis);
+      return p2.x >= -0.05 && p2.x <= 1.05 && p2.y >= -0.05 && p2.y <= 1.05;
+    };
+
+    const nPlaneU = unit(nPlane);
+    const hitsValid = (hits) => (
+      hits.length >= 2 &&
+      dist3(hits[0], hits[1]) > 2e-3 &&
+      Math.abs(dot(nPlaneU, sub(hits[0], p1))) < 1e-2 &&
+      Math.abs(dot(nPlaneU, sub(hits[1], p1))) < 1e-2
+    );
+
+    const prismEdgeDirs = [];
+    if (geom.isPrism) {
+      prismEdgeDirs.push([0, 0, 1]);
+      for (let k = 0; k < geom.nBase; k++) {
+        const dEdge = sub(geom.v3[(k + 1) % geom.nBase], geom.v3[k]);
+        if (norm(dEdge) > 1e-4) {
+          const du = unit(dEdge);
+          if (!prismEdgeDirs.some(ex => norm(cross(du, ex)) < 1e-3)) prismEdgeDirs.push(du);
+        }
+      }
+    }
+
+    const faceLines = {}, traceNodes = [], steps = [];
+    let projRuns = 0, didDiag = false;
     let center = [0,0,0];
     geom.v3.forEach(v => center = add(center, v));
     center = mul(center, 1 / geom.v3.length);
 
-    for (let iter = 0; iter < 14; iter++) {
+    for (let iter = 0; iter < 18; iter++) {
       let progressed = false;
 
       // 1) Две известные точки в одной грани
@@ -542,18 +660,27 @@
         const f = geom.faces[fi];
         const ptsInF = knownPts.filter(kp => isPointOnFace(kp.p3, f, geom));
         if (ptsInF.length >= 2) {
-          const pa = ptsInF[0], pb = ptsInF[1];
-          const hits = clipLineWithFace(pa.p3, sub(pb.p3, pa.p3), f, geom);
-          if (hits.length >= 2 && dist3(hits[0], hits[1]) > 1e-3) {
-            const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
-            faceLines[fi] = [ka, kb];
-            const samePair = (pa.name === ka.name && pb.name === kb.name) || (pa.name === kb.name && pb.name === ka.name);
-            if (!samePair) traces.push([pa.p3, pb.p3]);
-            steps.push(samePair
-              ? `Точки <b>${pa.name}</b> и <b>${pb.name}</b> в грани <b>${f.name}</b> — соединяем.`
-              : `В грани <b>${f.name}</b> проводим прямую <b>${pa.name}${pb.name}</b> → пересечение с рёбрами <b>${ka.name}</b>, <b>${kb.name}</b>.`);
-            progressed = true;
-            break;
+          let bestPair = null, bestD = 0;
+          for (let a = 0; a < ptsInF.length; a++) {
+            for (let b = a + 1; b < ptsInF.length; b++) {
+              const dd = dist3(ptsInF[a].p3, ptsInF[b].p3);
+              if (dd > bestD) { bestD = dd; bestPair = [ptsInF[a], ptsInF[b]]; }
+            }
+          }
+          if (bestPair && bestD > 2e-3) {
+            const [pa, pb] = bestPair;
+            const hits = clipLineWithFace(pa.p3, sub(pb.p3, pa.p3), f, geom);
+            if (hitsValid(hits)) {
+              const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
+              faceLines[fi] = [ka, kb];
+              const samePair = (pa.name === ka.name && pb.name === kb.name) || (pa.name === kb.name && pb.name === ka.name);
+              if (!samePair) addRay(pa.p3, pb.p3);
+              steps.push(samePair
+                ? `Точки <b>${pa.name}</b> и <b>${pb.name}</b> в грани <b>${f.name}</b> — соединяем.`
+                : `В грани <b>${f.name}</b> проводим прямую <b>${pa.name}${pb.name}</b> → пересечение с рёбрами <b>${ka.name}</b>, <b>${kb.name}</b>.`);
+              progressed = true;
+              break;
+            }
           }
         }
       }
@@ -564,13 +691,13 @@
         if (faceLines[fj]) continue;
         const fjObj = geom.faces[fj];
         const ptsInFj = knownPts.filter(kp => isPointOnFace(kp.p3, fjObj, geom));
-        if (ptsInFj.length !== 1) continue;
+        if (!ptsInFj.length) continue;
         const nj = unit(fjObj.normal);
         for (const [fiStr, [ka, kb]] of Object.entries(faceLines)) {
           const fi = Number(fiStr);
           if (norm(cross(unit(geom.faces[fi].normal), nj)) < 1e-3) {
             const hits = clipLineWithFace(ptsInFj[0].p3, sub(kb.p3, ka.p3), fjObj, geom);
-            if (hits.length >= 2 && dist3(hits[0], hits[1]) > 1e-3) {
+            if (hitsValid(hits)) {
               const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
               faceLines[fj] = [na, nb];
               steps.push(`<b>${geom.faces[fi].name}</b> ∥ <b>${fjObj.name}</b> — через <b>${ptsInFj[0].name}</b> проводим <b>${na.name}${nb.name}</b> ∥ <b>${ka.name}${kb.name}</b>.`);
@@ -584,6 +711,7 @@
       if (progressed) continue;
 
       // 3) Метод следов
+      let bestTrace = null;
       for (const [fiStr, [ka, kb]] of Object.entries(faceLines)) {
         const fi = Number(fiStr);
         const f1 = geom.faces[fi];
@@ -592,8 +720,7 @@
           const u = f1.verts[k], v = f1.verts[(k + 1) % f1.verts.length];
           const vu = geom.v3[u], vv = geom.v3[v];
           const X = intersectLines3D(ka.p3, dSeg, vu, sub(vv, vu));
-          if (!X || dist3(X, center) > 3.8) continue;
-
+          if (!X || dist3(X, center) > 3.6 || !inFrame(X)) continue;
           for (let fj = 0; fj < geom.faces.length; fj++) {
             if (fj === fi || faceLines[fj] || !isPointOnFace(X, geom.faces[fj], geom)) continue;
             const fjObj = geom.faces[fj];
@@ -601,81 +728,156 @@
             if (!ptsFj.length) continue;
             const qPt = ptsFj[0];
             const hits = clipLineWithFace(qPt.p3, sub(X, qPt.p3), fjObj, geom);
-            if (hits.length < 2 || dist3(hits[0], hits[1]) < 1e-3) continue;
-
-            const tName = nextXName();
-            if (!onSegment3D(X, vu, vv)) {
-              const nearSeg = dist3(X, ka.p3) < dist3(X, kb.p3) ? ka.p3 : kb.p3;
-              const nearEdge = dist3(X, vu) < dist3(X, vv) ? vu : vv;
-              traces.push([nearSeg, X], [nearEdge, X], [X, qPt.p3]);
-              traceNodes.push({ p3: X, name: tName, visible: faceVisible[fj] });
-              steps.push(`Продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до точки <b>${tName}</b>.`);
-            } else {
-              traces.push([X, qPt.p3]);
-              steps.push(`<b>${ka.name}${kb.name}</b> ∩ <b>${geom.labels[u]}${geom.labels[v]}</b> = <b>${tName}</b>.`);
-            }
-            const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
-            faceLines[fj] = [na, nb];
-            steps.push(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
-            progressed = true;
-            break;
+            if (!hitsValid(hits)) continue;
+            const dc = dist3(X, center);
+            if (!bestTrace || dc < bestTrace.dc) bestTrace = { dc, fi, ka, kb, u, v, vu, vv, X, fj, fjObj, qPt, hits };
           }
-          if (progressed) break;
         }
-        if (progressed) break;
       }
-      if (progressed) continue;
+      if (bestTrace) {
+        const { ka, kb, u, v, vu, vv, X, fj, fjObj, qPt, hits } = bestTrace;
+        const tName = nextXName();
+        if (!onSegment3D(X, vu, vv)) {
+          const nearSeg = dist3(X, ka.p3) < dist3(X, kb.p3) ? ka.p3 : kb.p3;
+          const nearEdge = dist3(X, vu) < dist3(X, vv) ? vu : vv;
+          addRay(nearSeg, X); addRay(nearEdge, X); addRay(X, qPt.p3);
+          traceNodes.push({ p3: X, name: tName, visible: isPtVisible(X) });
+          steps.push(`Продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до точки <b>${tName}</b>.`);
+        } else {
+          addRay(X, qPt.p3);
+          steps.push(`<b>${ka.name}${kb.name}</b> ∩ <b>${geom.labels[u]}${geom.labels[v]}</b> = <b>${tName}</b>.`);
+        }
+        const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
+        faceLines[fj] = [na, nb];
+        steps.push(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
+        continue;
+      }
 
-      // 4) Внутреннее проецирование на основание
-      if (!didProj) {
-        didProj = true;
-        const baseF = geom.faces[0];
-        const projBase = (p) => {
-          if (Math.abs(p[2]) < 1e-3) return [...p];
-          if (geom.isPyramid) {
-            if (p[2] > 0.999) return null;
-            return [p[0] / (1 - p[2]), p[1] / (1 - p[2]), 0];
+      // 4) Диагональные плоскости для 4-уг. пирамиды
+      if (!didDiag && geom.isPyramid && geom.nBase === 4) {
+        didDiag = true;
+        const [vA, vB, vC, vD, vS] = geom.v3;
+        const ODiag = intersectLines3D(vA, sub(vC, vA), vB, sub(vD, vB));
+        if (ODiag) {
+          const diagPlanes = [
+            { name:'SAC', tri:[vA, vC, vS], nor: unit(cross(sub(vC, vA), sub(vS, vA))) },
+            { name:'SBD', tri:[vB, vD, vS], nor: unit(cross(sub(vD, vB), sub(vS, vB))) }
+          ];
+          for (let pIdx = 0; pIdx < 2; pIdx++) {
+            const d1 = diagPlanes[pIdx], d2 = diagPlanes[1 - pIdx];
+            const pts1 = knownPts.filter(kp => Math.abs(dot(d1.nor, sub(kp.p3, d1.tri[0]))) < 2e-3);
+            const pts2 = knownPts.filter(kp => Math.abs(dot(d2.nor, sub(kp.p3, d2.tri[0]))) < 2e-3);
+            if (pts1.length >= 2 && pts2.length >= 1) {
+              const pa = pts1[0], pb = pts1[pts1.length - 1];
+              const pc = pts2.find(q => !onSegment3D(q.p3, vS, ODiag));
+              if (!pc) continue;
+              const M = intersectLines3D(pa.p3, sub(pb.p3, pa.p3), vS, sub(ODiag, vS));
+              if (!M || dist3(M, pc.p3) < 1e-2) continue;
+              const hitsD = clipLineWithPoly3D(pc.p3, sub(M, pc.p3), d2.tri);
+              const hNew = hitsD.find(h => Math.abs(dot(nPlaneU, sub(h, p1))) < 1e-2 && !knownPts.some(kp => dist3(kp.p3, h) < 2e-3));
+              if (hNew) {
+                const oName = nextXName(), mName = nextXName();
+                addRay(vA, vC); addRay(vB, vD); addRay(vS, ODiag); addRay(pa.p3, pb.p3); addRay(pc.p3, hNew);
+                traceNodes.push({ p3: ODiag, name: oName, visible: isPtVisible(ODiag) });
+                traceNodes.push({ p3: M, name: mName, visible: isPtVisible(M) });
+                const xNew = getOrAddPt(hNew);
+                steps.push(`В основании <b>AC ∩ BD = ${oName}</b> и <b>${mName} = ${pa.name}${pb.name} ∩ S${oName}</b>; в <b>${d2.name}</b> луч <b>${pc.name}${mName}</b> даёт <b>${xNew.name}</b>.`);
+                progressed = true;
+                break;
+              }
+            }
           }
-          return [p[0], p[1], 0];
-        };
+          if (progressed) continue;
+        }
+      }
+
+      // 5) Внутреннее проецирование (для пирамид — из S; для призм — строго вдоль рёбер!)
+      if (projRuns < 2) {
+        projRuns++;
+        const candPlanes = geom.isPyramid ? [0] : geom.faces.map((_, i) => i);
         const userPts = knownPts.filter(kp => kp.isUser);
-        for (let i = 0; i < userPts.length; i++) {
-          for (let j = i + 1; j < userPts.length; j++) {
-            const pa = userPts[i], pb = userPts[j];
-            if (Math.abs(pa.p3[2]) < 1e-2 || Math.abs(pb.p3[2]) < 1e-2) continue;
-            const paP = projBase(pa.p3), pbP = projBase(pb.p3);
-            if (!paP || !pbP || dist3(paP, pbP) < 1e-2) continue;
-            if (Math.abs(pa.p3[2] - pb.p3[2]) < 1e-2) {
-              const basePt = knownPts.find(kp => Math.abs(kp.p3[2]) < 1e-2);
-              if (basePt) {
-                const hits = clipLineWithFace(basePt.p3, sub(pbP, paP), baseF, geom);
-                if (hits.length >= 2) {
-                  traces.push([pa.p3, paP], [pb.p3, pbP], [paP, pbP]);
-                  const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
-                  faceLines[0] = [ka, kb];
-                  steps.push(`<b>${pa.name}${pb.name}</b> ∥ <b>${baseF.name}</b> — через <b>${basePt.name}</b> проводим <b>${ka.name}${kb.name}</b> ∥ ${pa.name}'${pb.name}'.`);
-                  progressed = true;
-                  break;
+        let bestProj = null;
+
+        for (const fIdx of candPlanes) {
+          const fObj = geom.faces[fIdx];
+          const fNorm = unit(fObj.normal);
+          const fV0 = geom.v3[fObj.verts[0]];
+          const hasPtOnTarget = knownPts.some(kp => isPointOnFace(kp.p3, fObj, geom));
+          const dirOpts = geom.isPyramid ? [null] : prismEdgeDirs;
+
+          for (const dRay of dirOpts) {
+            if (!geom.isPyramid && Math.abs(dot(fNorm, dRay)) < 1e-3) continue;
+            const projPlane = (p) => {
+              if (Math.abs(dot(fNorm, sub(p, fV0))) < 1e-3) return [...p];
+              if (geom.isPyramid) {
+                const S = geom.v3[geom.v3.length - 1];
+                const denom = dot(fNorm, sub(p, S));
+                if (Math.abs(denom) < 1e-4) return null;
+                const t = dot(fNorm, sub(fV0, S)) / denom;
+                return t <= 0 ? null : add(S, mul(sub(p, S), t));
+              }
+              return add(p, mul(dRay, dot(fNorm, sub(fV0, p)) / dot(fNorm, dRay)));
+            };
+
+            for (let i = 0; i < userPts.length; i++) {
+              for (let j = i + 1; j < userPts.length; j++) {
+                const pa = userPts[i], pb = userPts[j];
+                if (Math.abs(dot(fNorm, sub(pa.p3, fV0))) < 1e-2 || Math.abs(dot(fNorm, sub(pb.p3, fV0))) < 1e-2) continue;
+                const paP = projPlane(pa.p3), pbP = projPlane(pb.p3);
+                if (!paP || !pbP || dist3(paP, pbP) < 1e-2) continue;
+                const X = intersectLines3D(pa.p3, sub(pb.p3, pa.p3), paP, sub(pbP, paP));
+                if (!X || dist3(X, center) > 3.6 || !inFrame(X)) continue;
+                if (dist3(X, pa.p3) < 1e-2 || dist3(X, pb.p3) < 1e-2) continue;
+                if (knownPts.some(kp => dist3(kp.p3, X) < 1e-2)) continue;
+                const dc = dist3(X, center);
+                const rank = (hasPtOnTarget ? 0 : 100) + dc;
+                if (!bestProj || rank < bestProj.rank) {
+                  bestProj = { rank, fIdx, fObj, pa, pb, paP, pbP, X };
                 }
               }
-              continue;
             }
-            const X = intersectLines3D(pa.p3, sub(pb.p3, pa.p3), paP, sub(pbP, paP));
-            if (!X || dist3(X, center) > 3.8) continue;
-            if (dist3(X, pa.p3) < 1e-2 || dist3(X, pb.p3) < 1e-2) continue;
-
-            const tName = nextXName();
-            traces.push([pa.p3, paP], [pb.p3, pbP], [paP, pbP], [pa.p3, X], [pbP, X]);
-            traceNodes.push({ p3: X, name: tName, visible: faceVisible[0] });
-            knownPts.push({ p3: X, name: tName, isUser: false });
-            steps.push(`Проецируем <b>${pa.name}</b> и <b>${pb.name}</b> на <b>${baseF.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${pa.name}'${pb.name}'.`);
-            progressed = true;
-            break;
           }
-          if (progressed) break;
+        }
+
+        if (bestProj) {
+          const { fObj, pa, pb, paP, pbP, X } = bestProj;
+          let naP = nameIfExistingVertex(paP);
+          if (!naP) { naP = nextXName(); traceNodes.push({ p3: paP, name: naP, visible: isPtVisible(paP) }); }
+          let nbP = nameIfExistingVertex(pbP);
+          if (!nbP) { nbP = nextXName(); traceNodes.push({ p3: pbP, name: nbP, visible: isPtVisible(pbP) }); }
+          const tName = nextXName();
+          const rsA = geom.isPyramid ? geom.v3[geom.v3.length - 1] : pa.p3;
+          const rsB = geom.isPyramid ? geom.v3[geom.v3.length - 1] : pb.p3;
+          addRay(rsA, paP); addRay(rsB, pbP); addRay(paP, pbP); addRay(pa.p3, X); addRay(pbP, X);
+          traceNodes.push({ p3: X, name: tName, visible: isPtVisible(X) });
+          knownPts.push({ p3: X, name: tName, isUser: false });
+          steps.push(`Проецируем <b>${pa.name}→${naP}</b> и <b>${pb.name}→${nbP}</b> на <b>${fObj.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${naP}${nbP}.`);
+          continue;
         }
       }
-      if (!progressed) break;
+
+      // 6) Завершение одной недостающей грани (если следы выходят за границы кадра)
+      if (poly.length >= 3) {
+        let pick = null;
+        for (let fi = 0; fi < geom.faces.length; fi++) {
+          if (faceLines[fi]) continue;
+          const f = geom.faces[fi];
+          const onF = poly.filter(p => isPointOnFace(p, f, geom));
+          if (onF.length >= 2 && dist3(onF[0], onF[1]) > 2e-3) {
+            const hasK = knownPts.some(kp => isPointOnFace(kp.p3, f, geom));
+            if (hasK) { pick = { fi, f, onF }; break; }
+            if (!pick) pick = { fi, f, onF };
+          }
+        }
+        if (pick) {
+          const ka = getOrAddPt(pick.onF[0]), kb = getOrAddPt(pick.onF[1]);
+          faceLines[pick.fi] = [ka, kb];
+          steps.push(`В плоскости грани <b>${pick.f.name}</b> достраиваем отрезок сечения <b>${ka.name}${kb.name}</b>.`);
+          continue;
+        }
+      }
+
+      break;
     }
 
     steps.push(`Замыкаем контур: в сечении <b>${poly.length}-угольник</b>.`);
@@ -819,56 +1021,7 @@
     const v2 = geom.v3.map(v => proj2D(v, basis));
     const hasPhoto = Boolean(state.img);
 
-    if (!hideWire) {
-      geom.edges.forEach(([i, j], idx) => {
-        targetCtx.save();
-        targetCtx.beginPath();
-        targetCtx.moveTo(X(v2[i]), Y(v2[i]));
-        targetCtx.lineTo(X(v2[j]), Y(v2[j]));
-        if (!edgeVisible[idx]) targetCtx.setLineDash([5*scale, 5*scale]);
-        if (hasPhoto) {
-          targetCtx.lineWidth = (edgeVisible[idx] ? 3.4 : 2.6) * scale;
-          targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
-          targetCtx.stroke();
-        }
-        targetCtx.lineWidth = (edgeVisible[idx] ? 1.75 : 1.25) * scale;
-        targetCtx.strokeStyle = edgeVisible[idx] ? '#00C832' : '#006B1B';
-        targetCtx.stroke();
-        targetCtx.restore();
-      });
-
-      if (showLabels) {
-        geom.v3.forEach((_, i) => {
-          drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#9CFFAE', scale, 12);
-        });
-      }
-    }
-
-    if (showTrace && traces.length > 0) {
-      targetCtx.save();
-      targetCtx.setLineDash([4*scale, 4*scale]);
-      for (const [a3, b3] of traces) {
-        const a2 = proj2D(a3, basis), b2 = proj2D(b3, basis);
-        targetCtx.beginPath();
-        targetCtx.moveTo(X(a2), Y(a2));
-        targetCtx.lineTo(X(b2), Y(b2));
-        if (hasPhoto) {
-          targetCtx.lineWidth = 3.0 * scale;
-          targetCtx.strokeStyle = 'rgba(0,0,0,0.8)';
-          targetCtx.stroke();
-        }
-        targetCtx.lineWidth = 1.5 * scale;
-        targetCtx.strokeStyle = '#00C832';
-        targetCtx.stroke();
-      }
-      targetCtx.setLineDash([]);
-      for (const tn of traceNodes) {
-        const p2 = proj2D(tn.p3, basis);
-        drawSchoolPoint(targetCtx, X(p2), Y(p2), tn.visible, 4.5 * scale, tn.name, scale);
-      }
-      targetCtx.restore();
-    }
-
+    // 1. Заливка и 45° штриховка сечения рисуются ПЕРВЫМ слоем (чтобы линии за сечением были видны)
     if (poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
@@ -898,7 +1051,65 @@
         targetCtx.stroke();
         targetCtx.restore();
       }
+      targetCtx.restore();
+    }
 
+    // 2. Каркас фигуры
+    if (!hideWire) {
+      geom.edges.forEach(([i, j], idx) => {
+        targetCtx.save();
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(v2[i]), Y(v2[i]));
+        targetCtx.lineTo(X(v2[j]), Y(v2[j]));
+        if (!edgeVisible[idx]) targetCtx.setLineDash([5*scale, 5*scale]);
+        if (hasPhoto) {
+          targetCtx.lineWidth = (edgeVisible[idx] ? 3.4 : 2.6) * scale;
+          targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+          targetCtx.stroke();
+        }
+        targetCtx.lineWidth = (edgeVisible[idx] ? 1.75 : 1.25) * scale;
+        targetCtx.strokeStyle = edgeVisible[idx] ? '#00C832' : '#006B1B';
+        targetCtx.stroke();
+        targetCtx.restore();
+      });
+
+      if (showLabels) {
+        geom.v3.forEach((_, i) => {
+          drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#9CFFAE', scale, 12);
+        });
+      }
+    }
+
+    // 3. Вспомогательные линии (сплошные на видимых гранях / вне силуэта; пунктирные внутри объёма / на скрытых гранях)
+    if (showTrace && traces.length > 0) {
+      targetCtx.save();
+      for (const ray of traces) {
+        const a2 = proj2D(ray.a, basis), b2 = proj2D(ray.b, basis);
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(a2), Y(a2));
+        targetCtx.lineTo(X(b2), Y(b2));
+        targetCtx.setLineDash(ray.visible ? [] : [4.5*scale, 4.5*scale]);
+        if (hasPhoto) {
+          targetCtx.lineWidth = 3.0 * scale;
+          targetCtx.strokeStyle = 'rgba(0,0,0,0.8)';
+          targetCtx.stroke();
+        }
+        targetCtx.lineWidth = 1.5 * scale;
+        targetCtx.strokeStyle = '#00E840';
+        targetCtx.stroke();
+      }
+      targetCtx.setLineDash([]);
+      for (const tn of traceNodes) {
+        const p2 = proj2D(tn.p3, basis);
+        drawSchoolPoint(targetCtx, X(p2), Y(p2), tn.visible, 4.5 * scale, tn.name, scale);
+      }
+      targetCtx.restore();
+    }
+
+    // 4. Контур сечения поверх штриховки
+    if (poly.length >= 3) {
+      const poly2 = poly.map(p => proj2D(p, basis));
+      targetCtx.save();
       poly2.forEach((a, i) => {
         const b = poly2[(i + 1) % poly2.length];
         targetCtx.beginPath();
@@ -917,6 +1128,7 @@
       targetCtx.restore();
     }
 
+    // 5. Точки сечения
     const traceSet = new Set(traceNodes.map(t => t.name));
     const ptsToDraw = knownPts.length >= 3
       ? knownPts.filter(kp => !traceSet.has(kp.name))
@@ -985,7 +1197,11 @@
       : '<li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки. Новые точки построения автоматически получают имена X1, X2, X3...</span></li>';
 
     const sendBtn = document.getElementById('sendTgBtn');
-    if (tg && tg.initData && state.points.length === 3) sendBtn.style.display = 'inline-flex';
+    if (tg && !tg.initData && tg.platform && tg.platform !== 'unknown' && state.points.length === 3) {
+      sendBtn.style.display = 'inline-flex';
+    } else {
+      sendBtn.style.display = 'none';
+    }
   }
 
   // ---------- 8. Ввод ----------
@@ -1061,7 +1277,15 @@
     }
   });
 
-  window.addEventListener('pointerup', () => { state.dragging = null; state.pointerPos = null; draw(); });
+  function stopDrag() {
+    if (state.dragging || state.pointerPos) {
+      state.dragging = null;
+      state.pointerPos = null;
+      draw();
+    }
+  }
+  window.addEventListener('pointerup', stopDrag);
+  window.addEventListener('pointercancel', stopDrag);
 
   document.getElementById('shapeBar').addEventListener('click', (e) => {
     const card = e.target.closest('.shape-slot');
@@ -1104,12 +1328,16 @@
   document.getElementById('flipBtn').addEventListener('click', () => { state.flipDepth = !state.flipDepth; draw(); });
 
   document.getElementById('resetRegBtn').addEventListener('click', () => {
-    const N = SHAPE_META[state.shapeKey].N;
-    if (N > 3) { state.extraBase = computeRegularExtraBase(N); draw(); }
+    const meta = SHAPE_META[state.shapeKey];
+    if (meta && meta.hasExtra) {
+      state.extraBase = computeRegularExtraBase(meta.N);
+      draw();
+    }
   });
 
   function setMode(m) {
     state.mode = m;
+    state.snapPreview = null;
     document.getElementById('modeAnchorBtn').classList.toggle('active', m === 'anchors');
     document.getElementById('modePointsBtn').classList.toggle('active', m === 'points');
     document.getElementById('anchorControls').style.display = m === 'anchors' ? 'flex' : 'none';
@@ -1135,10 +1363,23 @@
     out.width = state.img ? state.img.naturalWidth : 1400;
     out.height = state.img ? state.img.naturalHeight : 960;
     renderToContext(out.getContext('2d'), out.width, out.height, true);
-    const link = document.createElement('a');
-    link.download = 'sechenie_matrix.png';
-    link.href = out.toDataURL('image/png');
-    link.click();
+    const triggerDownload = (href, revoke) => {
+      const link = document.createElement('a');
+      link.download = 'sechenie_matrix.png';
+      link.href = href;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      if (revoke) setTimeout(() => URL.revokeObjectURL(href), 1500);
+    };
+    if (out.toBlob) {
+      out.toBlob((blob) => {
+        if (blob) triggerDownload(URL.createObjectURL(blob), true);
+        else triggerDownload(out.toDataURL('image/png'), false);
+      }, 'image/png');
+    } else {
+      triggerDownload(out.toDataURL('image/png'), false);
+    }
   });
 
   document.getElementById('sendTgBtn').addEventListener('click', () => {
