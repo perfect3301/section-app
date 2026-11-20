@@ -189,7 +189,7 @@
       <span id="polyKindTag">[ ОЖИДАНИЕ ]</span>
     </div>
     <ol class="trace-list" id="stepsList">
-      <li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки M, N, P. Точки на задней грани/ребре автоматически выколоты (○).</span></li>
+      <li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки. Новые точки построения автоматически получают имена X1, X2, X3...</span></li>
     </ol>
   </div>
 
@@ -284,7 +284,6 @@
 
   // ---------- 3. Фигуры ----------
   const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
-  const EXTRA_PT_LETTERS = ['K', 'L', 'Q', 'R', 'T', 'U'];
 
   function computeRegularExtraBase(N) {
     if (N <= 3) return [];
@@ -363,7 +362,7 @@
   }
 
   // ---------- 4. Состояние ----------
-  const PT_NAMES = ['M', 'N', 'P'];
+  let ptNames = ['M', 'N', 'P'];
   let state = {
     img: null, imgW: 840, imgH: 580,
     shapeKey: 'cube',
@@ -395,17 +394,20 @@
   try {
     const presetParam = new URLSearchParams(location.search).get('preset');
     if (presetParam) {
-      const data = JSON.parse(atob(presetParam.replace(/-/g, '+').replace(/_/g, '/')));
+      const b64 = presetParam.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(b64), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+      const data = JSON.parse(jsonStr);
       if (SHAPE_META[data.shape]) {
         applyShapeDefaults(data.shape);
         if (Array.isArray(data.anchors) && data.anchors.length === 4) state.anchors = data.anchors.map(([x,y]) => ({x,y}));
         if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) state.extraBase = data.extraBase;
+        if (Array.isArray(data.ptNames) && data.ptNames.length === 3) ptNames = data.ptNames;
         if (Array.isArray(data.points3)) state.points = data.points3.slice(0,3).map(p3 => ({ p3 }));
       }
     }
   } catch (_) {}
 
-  // ---------- 5. Расчёт сечения и школьного алгоритма тетради ----------
+  // ---------- 5. Расчёт сечения и построение (все новые точки = X1, X2, X3...) ----------
   function getBasis() {
     const [A, B, C, T] = state.anchors;
     return { O: A, e1: {x: B.x-A.x, y: B.y-A.y}, e2: {x: C.x-A.x, y: C.y-A.y}, e3: {x: T.x-A.x, y: T.y-A.y} };
@@ -509,27 +511,29 @@
   }
 
   function buildNotebookSteps(geom, faceVisible, givenPts, poly) {
-    const knownPts = givenPts.map((g, i) => ({ p3: g.p3, name: PT_NAMES[i], isUser: true }));
-    let extraIdx = 0;
+    const knownPts = givenPts.map((g, i) => ({ p3: g.p3, name: ptNames[i] || `P${i+1}`, isUser: true }));
+    const usedNames = new Set(knownPts.map(k => k.name));
+    let xCounter = 1;
+    const nextXName = () => {
+      while (true) {
+        const cand = `X${xCounter++}`;
+        if (!usedNames.has(cand)) { usedNames.add(cand); return cand; }
+      }
+    };
     const getOrAddPt = (p3) => {
       for (const kp of knownPts) if (dist3(kp.p3, p3) < 1e-3) return kp;
-      const name = extraIdx < EXTRA_PT_LETTERS.length ? EXTRA_PT_LETTERS[extraIdx] : `T${extraIdx}`;
-      extraIdx++;
-      const kp = { p3, name, isUser: false };
+      const kp = { p3, name: nextXName(), isUser: false };
       knownPts.push(kp);
       return kp;
     };
 
-    const faceLines = {};
-    const traces = [];
-    const traceNodes = [];
-    const steps = [];
-    let traceNum = 1, didProj = false;
+    const faceLines = {}, traces = [], traceNodes = [], steps = [];
+    let didProj = false;
     let center = [0,0,0];
     geom.v3.forEach(v => center = add(center, v));
     center = mul(center, 1 / geom.v3.length);
 
-    for (let iter = 0; iter < 12; iter++) {
+    for (let iter = 0; iter < 14; iter++) {
       let progressed = false;
 
       // 1) Две известные точки в одной грани
@@ -544,9 +548,10 @@
             const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
             faceLines[fi] = [ka, kb];
             const samePair = (pa.name === ka.name && pb.name === kb.name) || (pa.name === kb.name && pb.name === ka.name);
+            if (!samePair) traces.push([pa.p3, pb.p3]);
             steps.push(samePair
-              ? `Точки <b>${pa.name}</b> и <b>${pb.name}</b> в одной грани <b>${f.name}</b> — соединяем.`
-              : `В грани <b>${f.name}</b> проводим прямую <b>${pa.name}${pb.name}</b> → отрезок <b>${ka.name}${kb.name}</b>.`);
+              ? `Точки <b>${pa.name}</b> и <b>${pb.name}</b> в грани <b>${f.name}</b> — соединяем.`
+              : `В грани <b>${f.name}</b> проводим прямую <b>${pa.name}${pb.name}</b> → пересечение с рёбрами <b>${ka.name}</b>, <b>${kb.name}</b>.`);
             progressed = true;
             break;
           }
@@ -587,31 +592,31 @@
           const u = f1.verts[k], v = f1.verts[(k + 1) % f1.verts.length];
           const vu = geom.v3[u], vv = geom.v3[v];
           const X = intersectLines3D(ka.p3, dSeg, vu, sub(vv, vu));
-          if (!X || dist3(X, center) > 4.5) continue;
+          if (!X || dist3(X, center) > 3.8) continue;
 
           for (let fj = 0; fj < geom.faces.length; fj++) {
             if (fj === fi || faceLines[fj] || !isPointOnFace(X, geom.faces[fj], geom)) continue;
             const fjObj = geom.faces[fj];
-            const ptsFj = knownPts.filter(kp => isPointOnFace(kp.p3, fjObj, geom) && dist3(kp.p3, X) > 1e-3);
+            const ptsFj = knownPts.filter(kp => isPointOnFace(kp.p3, fjObj, geom) && dist3(kp.p3, X) > 1e-2);
             if (!ptsFj.length) continue;
             const qPt = ptsFj[0];
             const hits = clipLineWithFace(qPt.p3, sub(X, qPt.p3), fjObj, geom);
             if (hits.length < 2 || dist3(hits[0], hits[1]) < 1e-3) continue;
 
-            const tName = `X${traceNum++}`;
+            const tName = nextXName();
             if (!onSegment3D(X, vu, vv)) {
               const nearSeg = dist3(X, ka.p3) < dist3(X, kb.p3) ? ka.p3 : kb.p3;
               const nearEdge = dist3(X, vu) < dist3(X, vv) ? vu : vv;
               traces.push([nearSeg, X], [nearEdge, X], [X, qPt.p3]);
               traceNodes.push({ p3: X, name: tName, visible: faceVisible[fj] });
-              steps.push(`<b>След ${tName}:</b> продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до пересечения в <b>${tName}</b>.`);
+              steps.push(`Продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до точки <b>${tName}</b>.`);
             } else {
               traces.push([X, qPt.p3]);
-              steps.push(`<b>${ka.name}${kb.name}</b> пересекает ребро <b>${geom.labels[u]}${geom.labels[v]}</b> в <b>${tName}</b>.`);
+              steps.push(`<b>${ka.name}${kb.name}</b> ∩ <b>${geom.labels[u]}${geom.labels[v]}</b> = <b>${tName}</b>.`);
             }
             const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
             faceLines[fj] = [na, nb];
-            steps.push(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → отрезок <b>${na.name}${nb.name}</b>.`);
+            steps.push(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
             progressed = true;
             break;
           }
@@ -621,7 +626,7 @@
       }
       if (progressed) continue;
 
-      // 4) Внутреннее проецирование на основание (если точки в разных несмежных гранях)
+      // 4) Внутреннее проецирование на основание
       if (!didProj) {
         didProj = true;
         const baseF = geom.faces[0];
@@ -637,19 +642,33 @@
         for (let i = 0; i < userPts.length; i++) {
           for (let j = i + 1; j < userPts.length; j++) {
             const pa = userPts[i], pb = userPts[j];
-            if (Math.abs(pa.p3[2] - pb.p3[2]) < 1e-3) continue;
+            if (Math.abs(pa.p3[2]) < 1e-2 || Math.abs(pb.p3[2]) < 1e-2) continue;
             const paP = projBase(pa.p3), pbP = projBase(pb.p3);
-            if (!paP || !pbP || dist3(paP, pbP) < 1e-3) continue;
+            if (!paP || !pbP || dist3(paP, pbP) < 1e-2) continue;
+            if (Math.abs(pa.p3[2] - pb.p3[2]) < 1e-2) {
+              const basePt = knownPts.find(kp => Math.abs(kp.p3[2]) < 1e-2);
+              if (basePt) {
+                const hits = clipLineWithFace(basePt.p3, sub(pbP, paP), baseF, geom);
+                if (hits.length >= 2) {
+                  traces.push([pa.p3, paP], [pb.p3, pbP], [paP, pbP]);
+                  const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
+                  faceLines[0] = [ka, kb];
+                  steps.push(`<b>${pa.name}${pb.name}</b> ∥ <b>${baseF.name}</b> — через <b>${basePt.name}</b> проводим <b>${ka.name}${kb.name}</b> ∥ ${pa.name}'${pb.name}'.`);
+                  progressed = true;
+                  break;
+                }
+              }
+              continue;
+            }
             const X = intersectLines3D(pa.p3, sub(pb.p3, pa.p3), paP, sub(pbP, paP));
-            if (!X || dist3(X, center) > 4.5) continue;
+            if (!X || dist3(X, center) > 3.8) continue;
+            if (dist3(X, pa.p3) < 1e-2 || dist3(X, pb.p3) < 1e-2) continue;
 
-            const tName = `X${traceNum++}`;
-            if (dist3(pa.p3, paP) > 1e-3) traces.push([pa.p3, paP]);
-            if (dist3(pb.p3, pbP) > 1e-3) traces.push([pb.p3, pbP]);
-            traces.push([paP, pbP], [pa.p3, X], [pbP, X]);
+            const tName = nextXName();
+            traces.push([pa.p3, paP], [pb.p3, pbP], [paP, pbP], [pa.p3, X], [pbP, X]);
             traceNodes.push({ p3: X, name: tName, visible: faceVisible[0] });
             knownPts.push({ p3: X, name: tName, isUser: false });
-            steps.push(`Проецируем <b>${pa.name}</b> и <b>${pb.name}</b> на основание <b>${baseF.name}</b> и находим след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${pa.name}'${pb.name}'.`);
+            steps.push(`Проецируем <b>${pa.name}</b> и <b>${pb.name}</b> на <b>${baseF.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${pa.name}'${pb.name}'.`);
             progressed = true;
             break;
           }
@@ -659,7 +678,7 @@
       if (!progressed) break;
     }
 
-    steps.push(`Замыкаем контур: получен <b>${poly.length}-угольник</b> (кружочки ○ — на задних гранях/рёбрах).`);
+    steps.push(`Замыкаем контур: в сечении <b>${poly.length}-угольник</b>.`);
     return { knownPts, traces, traceNodes, steps };
   }
 
@@ -712,7 +731,7 @@
     return null;
   }
 
-  // ---------- 7. Рендер (Black & Green + выколотые ○) ----------
+  // ---------- 7. Рендер ----------
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -731,43 +750,28 @@
   function drawBracketReticle(c, x, y, r, color, scale) {
     const b = r * 0.48;
     c.save();
-    c.strokeStyle = '#000000';
-    c.lineWidth = 4.2 * scale;
+    c.strokeStyle = '#000000'; c.lineWidth = 4.2 * scale;
     c.beginPath();
     c.moveTo(x - r, y - r + b); c.lineTo(x - r, y - r); c.lineTo(x - r + b, y - r);
     c.moveTo(x + r - b, y - r); c.lineTo(x + r, y - r); c.lineTo(x + r, y - r + b);
     c.moveTo(x + r, y + r - b); c.lineTo(x + r, y + r); c.lineTo(x + r - b, y + r);
     c.moveTo(x - r + b, y + r); c.lineTo(x - r, y + r); c.lineTo(x - r, y + r - b);
     c.stroke();
-    c.strokeStyle = color;
-    c.lineWidth = 1.9 * scale;
-    c.stroke();
-    c.fillStyle = '#000000';
-    c.fillRect(x - 3*scale, y - 3*scale, 6*scale, 6*scale);
-    c.fillStyle = color;
-    c.fillRect(x - 1.8*scale, y - 1.8*scale, 3.6*scale, 3.6*scale);
+    c.strokeStyle = color; c.lineWidth = 1.9 * scale; c.stroke();
+    c.fillStyle = '#000000'; c.fillRect(x - 3*scale, y - 3*scale, 6*scale, 6*scale);
+    c.fillStyle = color; c.fillRect(x - 1.8*scale, y - 1.8*scale, 3.6*scale, 3.6*scale);
     c.restore();
   }
 
   function drawSchoolPoint(c, px, py, visible, r, label, scale) {
     c.save();
-    c.beginPath();
-    c.arc(px, py, r + 1.5 * scale, 0, Math.PI * 2);
-    c.fillStyle = '#000000';
-    c.fill();
-
-    c.beginPath();
-    c.arc(px, py, r, 0, Math.PI * 2);
+    c.beginPath(); c.arc(px, py, r + 1.5 * scale, 0, Math.PI * 2); c.fillStyle = '#000000'; c.fill();
+    c.beginPath(); c.arc(px, py, r, 0, Math.PI * 2);
     if (visible) {
-      c.fillStyle = '#00FF41';
-      c.fill();
+      c.fillStyle = '#00FF41'; c.fill();
     } else {
-      // Выколотая точка (○) на задней грани/ребре
-      c.fillStyle = '#000000';
-      c.fill();
-      c.lineWidth = 2.1 * scale;
-      c.strokeStyle = '#00FF41';
-      c.stroke();
+      c.fillStyle = '#000000'; c.fill();
+      c.lineWidth = 2.1 * scale; c.strokeStyle = '#00FF41'; c.stroke();
     }
     c.restore();
     if (label) drawLabel(c, label, px + r + 5 * scale, py - r - 3 * scale, '#00FF41', scale, 12.5);
@@ -840,7 +844,6 @@
       }
     }
 
-    // Вспомогательные линии тетради (следы и проекции)
     if (showTrace && traces.length > 0) {
       targetCtx.save();
       targetCtx.setLineDash([4*scale, 4*scale]);
@@ -861,12 +864,11 @@
       targetCtx.setLineDash([]);
       for (const tn of traceNodes) {
         const p2 = proj2D(tn.p3, basis);
-        drawSchoolPoint(targetCtx, X(p2), Y(p2), tn.visible, 4.5 * scale, tn.label, scale);
+        drawSchoolPoint(targetCtx, X(p2), Y(p2), tn.visible, 4.5 * scale, tn.name, scale);
       }
       targetCtx.restore();
     }
 
-    // Многоугольник сечения + штриховка 45°
     if (poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
@@ -915,10 +917,10 @@
       targetCtx.restore();
     }
 
-    // Все точки сечения: закрашенные ● (видимые) и выколотые ○ (задние)
+    const traceSet = new Set(traceNodes.map(t => t.name));
     const ptsToDraw = knownPts.length >= 3
-      ? knownPts.filter(kp => !kp.name.startsWith('X'))
-      : state.points.map((pt, i) => ({ p3: pt.p3, name: PT_NAMES[i] }));
+      ? knownPts.filter(kp => !traceSet.has(kp.name))
+      : state.points.map((pt, i) => ({ p3: pt.p3, name: ptNames[i] || `P${i+1}` }));
 
     ptsToDraw.forEach((kp) => {
       const p2 = proj2D(kp.p3, basis);
@@ -980,7 +982,7 @@
     const list = document.getElementById('stepsList');
     list.innerHTML = res.steps.length > 0
       ? res.steps.map((s, i) => `<li><span class="trace-idx">${String(i+1).padStart(2,'0')}&gt;</span><span>${s}</span></li>`).join('')
-      : '<li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки M, N, P. Точки на задней грани/ребре автоматически выколоты (○).</span></li>';
+      : '<li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки. Новые точки построения автоматически получают имена X1, X2, X3...</span></li>';
 
     const sendBtn = document.getElementById('sendTgBtn');
     if (tg && tg.initData && state.points.length === 3) sendBtn.style.display = 'inline-flex';
