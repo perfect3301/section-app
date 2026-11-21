@@ -45,6 +45,7 @@
     }
     .t-btn.inv { background: var(--g-bright); color: var(--black); border-color: var(--g-bright); }
     .t-btn.dim { color: var(--g-mid); border-color: var(--g-dim); }
+    .t-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .t-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
     .shape-bar { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
@@ -91,18 +92,37 @@
 
     .trace-log { background: var(--bg-panel); border: 1px solid var(--g-dim); }
     .trace-head {
-      display: flex; justify-content: space-between; padding: 5px 8px; background: var(--bg-dim);
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px;
+      padding: 5px 8px; background: var(--bg-dim);
       border-bottom: 1px solid var(--g-dim); font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em;
     }
+    .step-player { display: inline-flex; align-items: center; gap: 3px; }
+    .sp-btn {
+      height: 22px; padding: 0 7px; background: var(--black); color: var(--g-bright);
+      border: 1px solid var(--g-mid); font-family: inherit; font-size: 10px; font-weight: 700;
+      cursor: pointer; user-select: none;
+    }
+    .sp-btn.mid { min-width: 78px; text-align: center; }
+    .sp-btn.active { background: var(--g-bright); color: var(--black); border-color: var(--g-bright); }
     .trace-list { list-style: none; margin: 0; padding: 4px 0; }
     .trace-list li {
       display: grid; grid-template-columns: 32px 1fr; gap: 6px; padding: 5px 8px;
       font-size: 11.5px; color: var(--g-mid); border-bottom: 1px solid rgba(0, 71, 15, 0.45);
+      cursor: pointer;
     }
     .trace-list li:last-child { border-bottom: none; }
+    .trace-list li.step-active { background: var(--bg-dim); color: var(--g-bright); }
+    .trace-list li.step-future { opacity: 0.42; }
     .trace-idx { color: var(--g-bright); font-weight: 700; }
     .trace-list b { color: var(--g-bright); font-weight: 700; }
-    .foot-row { display: flex; gap: 6px; }
+
+    .foot-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .foot-row .t-btn { flex: 1 1 135px; height: 40px; font-size: 12px; }
+    .net-status {
+      padding: 5px 8px; background: var(--bg-panel); border: 1px solid var(--g-mid);
+      color: var(--g-bright); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .net-status.err { border-color: #FF4141; color: #FF7A7A; }
     input[type="file"] { display: none; }
   </style>
 </head>
@@ -192,6 +212,7 @@
       <label class="flag-lbl"><input type="checkbox" id="showTraceCb" checked /><span class="flag-box"></span>СЛЕДЫ</label>
       <label class="flag-lbl"><input type="checkbox" id="showLabelsCb" checked /><span class="flag-box"></span>БУКВЫ</label>
       <label class="flag-lbl"><input type="checkbox" id="hideWireCb" /><span class="flag-box"></span>ТОЛЬКО_СЕЧ</label>
+      <label class="flag-lbl"><input type="checkbox" id="taskOnlyCb" /><span class="flag-box"></span>ТОЛЬКО_УСЛОВИЕ</label>
       <label class="flag-lbl" id="greenFilterWrap" style="display:none;"><input type="checkbox" id="greenFilterCb" /><span class="flag-box"></span>ЗЕЛ_ФИЛЬТР</label>
     </div>
   </div>
@@ -199,6 +220,11 @@
   <div class="trace-log">
     <div class="trace-head">
       <span>&gt; ТЕТРАДЬ_ПОСТРОЕНИЯ</span>
+      <div class="step-player" id="stepPlayer" style="display:none;">
+        <button class="sp-btn" id="stepPrevBtn" title="Предыдущий шаг">&lt;&lt;</button>
+        <button class="sp-btn mid" id="stepToggleBtn">ВСЕ</button>
+        <button class="sp-btn" id="stepNextBtn" title="Следующий шаг">&gt;&gt;</button>
+      </div>
       <span id="polyKindTag">[ ОЖИДАНИЕ ]</span>
     </div>
     <ol class="trace-list" id="stepsList">
@@ -207,20 +233,36 @@
   </div>
 
   <div class="foot-row">
-    <button class="t-btn inv" id="downloadBtn" style="flex:1; height:40px; font-size:12.5px;">&gt; СКАЧАТЬ_PNG</button>
-    <button class="t-btn" id="sendTgBtn" style="display:none; flex:1; height:40px; font-size:12.5px;">&gt; В_БОТА</button>
+    <button class="t-btn inv" id="downloadBtn">&gt; СКАЧАТЬ_PNG</button>
+    <button class="t-btn" id="exportSvgBtn">&gt; ЭКСПОРТ_SVG</button>
+    <button class="t-btn inv" id="saveToChatBtn" style="display:none;">&gt; СОХРАНИТЬ_В_ЧАТ</button>
+    <button class="t-btn" id="sendTgBtn" style="display:none;">&gt; В_БОТА</button>
   </div>
+
+  <div class="net-status" id="netStatusBar" style="display:none;"></div>
 
 </div>
 
 <script>
 (() => {
+  // Базовый URL API (можно переопределить через параметр ?api=...)
+  const DEFAULT_API_BASE = '';
+
   const tg = window.Telegram?.WebApp;
   if (tg) {
     tg.ready();
     tg.expand();
     try { tg.disableVerticalSwipes(); tg.setHeaderColor('#000000'); tg.setBackgroundColor('#000000'); } catch (_) {}
   }
+
+  const urlParams = new URLSearchParams(location.search);
+  const urlPresetId = (urlParams.get('id') || urlParams.get('preset_id') || '').trim();
+  const rawApiParam = (urlParams.get('api') || DEFAULT_API_BASE).trim().replace(/\/+$/, '');
+  const apiBase = rawApiParam || (
+    urlPresetId && location.protocol.startsWith('http') && !location.hostname.endsWith('github.io')
+      ? location.origin
+      : ''
+  );
 
   // ---------- 1. Фоновый код Матрицы ----------
   const rainCanvas = document.getElementById('rainCanvas');
@@ -295,7 +337,7 @@
     return inside;
   }
 
-  // ---------- 3. Фигуры (синхронизировано с bot.py) ----------
+  // ---------- 3. Фигуры (синхронизировано с geometry.py) ----------
   const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   function computeRegularExtraBase(N) {
@@ -404,7 +446,7 @@
     return { labels, v3, anchors: [0, 1, 2, N], extraIndices, isPyramid: true, isPrism: false, nBase: N, edges, faces };
   }
 
-  // ---------- 4. Состояние ----------
+  // ---------- 4. Состояние и загрузка пресетов ----------
   let ptNames = ['M', 'N', 'P'];
   let state = {
     img: null, imgW: 840, imgH: 580,
@@ -417,8 +459,25 @@
     points: [],
     dragging: null,
     pointerPos: null,
-    snapPreview: null
+    snapPreview: null,
+    presetId: urlPresetId || null,
+    isTaskOnly: false,
+    playStep: null,
+    lastStepCount: 0
   };
+
+  function setNetStatus(text, isErr = false) {
+    const bar = document.getElementById('netStatusBar');
+    if (!text) {
+      bar.style.display = 'none';
+      bar.textContent = '';
+      bar.classList.remove('err');
+      return;
+    }
+    bar.style.display = 'block';
+    bar.textContent = text;
+    bar.classList.toggle('err', isErr);
+  }
 
   function applyShapeDefaults(key, resetNames = true) {
     state.shapeKey = key;
@@ -426,6 +485,7 @@
     state.anchors = meta.defaultAnchors.map(([x,y]) => ({x,y}));
     state.extraBase = meta.hasExtra ? computeRegularExtraBase(meta.N) : [];
     state.points = [];
+    state.playStep = null;
     if (resetNames) ptNames = ['M', 'N', 'P'];
     document.querySelectorAll('.shape-slot').forEach(el => el.classList.toggle('active', el.dataset.shape === key));
     document.getElementById('hudShape').textContent = meta.title;
@@ -435,28 +495,92 @@
       : '> Совместите 4 прицела [+] с углами фигуры';
   }
 
+  function applyPresetPayload(data) {
+    if (!data || !SHAPE_META[data.shape]) return false;
+    applyShapeDefaults(data.shape, false);
+    if (data.aspect && data.aspect > 0.2 && data.aspect < 5) {
+      state.imgW = 840;
+      state.imgH = Math.max(360, Math.min(1260, Math.round(840 / data.aspect)));
+    }
+    if (Array.isArray(data.anchors) && data.anchors.length === 4) {
+      state.anchors = data.anchors.map(([x,y]) => ({x: Number(x), y: Number(y)}));
+    }
+    if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) {
+      state.extraBase = data.extraBase.map(([x,y]) => [Number(x), Number(y)]);
+    }
+    if (Array.isArray(data.ptNames) && data.ptNames.length === 3) {
+      ptNames = data.ptNames.map(s => String(s || ''));
+    }
+    if (Array.isArray(data.points3)) {
+      state.points = data.points3.slice(0, 3).map(p3 => ({ p3: p3.map(Number) }));
+    }
+    if (typeof data.flipDepth === 'boolean') {
+      state.flipDepth = data.flipDepth;
+    }
+    if (typeof data.isTaskOnly === 'boolean') {
+      state.isTaskOnly = data.isTaskOnly;
+    }
+    state.playStep = null;
+    return true;
+  }
+
+  // Fallback-загрузка из ?preset=...
   try {
-    const presetParam = new URLSearchParams(location.search).get('preset');
+    const presetParam = urlParams.get('preset');
     if (presetParam) {
       let b64 = presetParam.replace(/-/g, '+').replace(/_/g, '/');
       while (b64.length % 4) b64 += '=';
       const jsonStr = decodeURIComponent(Array.prototype.map.call(atob(b64), c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-      const data = JSON.parse(jsonStr);
-      if (SHAPE_META[data.shape]) {
-        applyShapeDefaults(data.shape, false);
-        if (data.aspect && data.aspect > 0.2 && data.aspect < 5) {
-          state.imgW = 840;
-          state.imgH = Math.max(360, Math.min(1260, Math.round(840 / data.aspect)));
-        }
-        if (Array.isArray(data.anchors) && data.anchors.length === 4) state.anchors = data.anchors.map(([x,y]) => ({x,y}));
-        if (Array.isArray(data.extraBase) && data.extraBase.length === state.extraBase.length) state.extraBase = data.extraBase;
-        if (Array.isArray(data.ptNames) && data.ptNames.length === 3) ptNames = data.ptNames;
-        if (Array.isArray(data.points3)) state.points = data.points3.slice(0,3).map(p3 => ({ p3 }));
-      }
+      applyPresetPayload(JSON.parse(jsonStr));
     }
   } catch (_) {}
 
-  // ---------- 5. Расчёт сечения и построение (все новые точки = X1, X2, X3...) ----------
+  async function loadRemotePresetIfNeeded() {
+    if (!urlPresetId || !apiBase) return;
+    setNetStatus('[ ЗАГРУЗКА_ПРЕСЕТА... ]');
+    try {
+      const resp = await fetch(`${apiBase}/api/preset?id=${encodeURIComponent(urlPresetId)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (!data.ok || !applyPresetPayload(data)) {
+        throw new Error(data.error || 'Некорректный пресет');
+      }
+      state.presetId = data.id || urlPresetId;
+      draw();
+
+      if (data.hasPhoto && tg?.initData) {
+        try {
+          const phResp = await fetch(`${apiBase}/api/photo?id=${encodeURIComponent(state.presetId)}`, {
+            headers: { 'X-Telegram-Init-Data': tg.initData }
+          });
+          if (phResp.ok) {
+            const blob = await phResp.blob();
+            const objUrl = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+              state.img = img;
+              const k = img.width > 1200 ? 1200 / img.width : 1;
+              state.imgW = Math.round(img.width * k);
+              state.imgH = Math.round(img.height * k);
+              rainCanvas.style.display = 'none';
+              document.getElementById('clearPhotoBtn').style.display = 'inline-flex';
+              document.getElementById('greenFilterWrap').style.display = 'inline-flex';
+              URL.revokeObjectURL(objUrl);
+              draw();
+            };
+            img.onerror = () => URL.revokeObjectURL(objUrl);
+            img.src = objUrl;
+          }
+        } catch (_) {}
+      }
+      setNetStatus('');
+    } catch (err) {
+      setNetStatus(`[ ПРЕСЕТ НЕ ЗАГРУЖЕН: ${err.message} ]`, true);
+      setTimeout(() => setNetStatus(''), 4000);
+    }
+  }
+
+  // ---------- 5. Расчёт сечения и пошаговые снапшоты ----------
   function getBasis() {
     const [A, B, C, T] = state.anchors;
     return { O: A, e1: {x: B.x-A.x, y: B.y-A.y}, e2: {x: C.x-A.x, y: C.y-A.y}, e3: {x: T.x-A.x, y: T.y-A.y} };
@@ -529,13 +653,17 @@
     );
 
     if (state.points.length < 3) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: [] };
+      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: [], snapshots: [] };
     }
 
     const [P1, P2, P3] = state.points.map(p => p.p3);
     const N = cross(sub(P2, P1), sub(P3, P1));
     if (norm(N) < 1e-6) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: ['ERR: Точки лежат на одной прямой — сдвиньте одну из точек.'] };
+      return {
+        geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
+        steps: ['ERR: Точки лежат на одной прямой — сдвиньте одну из точек.'],
+        snapshots: []
+      };
     }
 
     const planeVal = p => dot(N, sub(p, P1));
@@ -552,7 +680,11 @@
     const uniq = [];
     for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1.5e-3)) uniq.push(p);
     if (uniq.length < 3) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: ['EMPTY: Плоскость не даёт сечения внутри фигуры.'] };
+      return {
+        geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
+        steps: ['EMPTY: Плоскость не даёт сечения внутри фигуры.'],
+        snapshots: []
+      };
     }
 
     let center = [0,0,0];
@@ -616,6 +748,7 @@
     };
 
     const traces = [];
+    const builtSegs = [];
     const addRay = (pa, pb) => {
       if (dist3(pa, pb) >= 2e-3) traces.push({ a: pa, b: pb, visible: isSegVisible(pa, pb) });
     };
@@ -645,7 +778,18 @@
       }
     }
 
-    const faceLines = {}, traceNodes = [], steps = [];
+    const faceLines = {}, traceNodes = [], steps = [], snapshots = [];
+    const pushStep = (htmlText, polyReady = false) => {
+      steps.push(htmlText);
+      snapshots.push({
+        pts: knownPts.map(kp => ({ p3: [...kp.p3], name: kp.name, isUser: kp.isUser })),
+        rays: traces.map(r => ({ a: [...r.a], b: [...r.b], visible: r.visible })),
+        traceNodes: traceNodes.map(t => ({ p3: [...t.p3], name: t.name, visible: t.visible })),
+        segs: builtSegs.map(s => ({ a: [...s.a], b: [...s.b], visible: s.visible })),
+        polyReady
+      });
+    };
+
     let projRuns = 0, didDiag = false;
     let center = [0,0,0];
     geom.v3.forEach(v => center = add(center, v));
@@ -673,9 +817,10 @@
             if (hitsValid(hits)) {
               const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
               faceLines[fi] = [ka, kb];
+              builtSegs.push({ a: ka.p3, b: kb.p3, visible: faceVisible[fi] });
               const samePair = (pa.name === ka.name && pb.name === kb.name) || (pa.name === kb.name && pb.name === ka.name);
               if (!samePair) addRay(pa.p3, pb.p3);
-              steps.push(samePair
+              pushStep(samePair
                 ? `Точки <b>${pa.name}</b> и <b>${pb.name}</b> в грани <b>${f.name}</b> — соединяем.`
                 : `В грани <b>${f.name}</b> проводим прямую <b>${pa.name}${pb.name}</b> → пересечение с рёбрами <b>${ka.name}</b>, <b>${kb.name}</b>.`);
               progressed = true;
@@ -700,7 +845,8 @@
             if (hitsValid(hits)) {
               const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
               faceLines[fj] = [na, nb];
-              steps.push(`<b>${geom.faces[fi].name}</b> ∥ <b>${fjObj.name}</b> — через <b>${ptsInFj[0].name}</b> проводим <b>${na.name}${nb.name}</b> ∥ <b>${ka.name}${kb.name}</b>.`);
+              builtSegs.push({ a: na.p3, b: nb.p3, visible: faceVisible[fj] });
+              pushStep(`<b>${geom.faces[fi].name}</b> ∥ <b>${fjObj.name}</b> — через <b>${ptsInFj[0].name}</b> проводим <b>${na.name}${nb.name}</b> ∥ <b>${ka.name}${kb.name}</b>.`);
               progressed = true;
               break;
             }
@@ -740,16 +886,17 @@
         if (!onSegment3D(X, vu, vv)) {
           const nearSeg = dist3(X, ka.p3) < dist3(X, kb.p3) ? ka.p3 : kb.p3;
           const nearEdge = dist3(X, vu) < dist3(X, vv) ? vu : vv;
-          addRay(nearSeg, X); addRay(nearEdge, X); addRay(X, qPt.p3);
+          addRay(nearSeg, X); addRay(nearEdge, X);
           traceNodes.push({ p3: X, name: tName, visible: isPtVisible(X) });
-          steps.push(`Продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до точки <b>${tName}</b>.`);
+          pushStep(`Продлеваем <b>${ka.name}${kb.name}</b> и ребро <b>${geom.labels[u]}${geom.labels[v]}</b> до точки <b>${tName}</b>.`);
         } else {
-          addRay(X, qPt.p3);
-          steps.push(`<b>${ka.name}${kb.name}</b> ∩ <b>${geom.labels[u]}${geom.labels[v]}</b> = <b>${tName}</b>.`);
+          pushStep(`<b>${ka.name}${kb.name}</b> ∩ <b>${geom.labels[u]}${geom.labels[v]}</b> = <b>${tName}</b>.`);
         }
+        addRay(X, qPt.p3);
         const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
         faceLines[fj] = [na, nb];
-        steps.push(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
+        builtSegs.push({ a: na.p3, b: nb.p3, visible: faceVisible[fj] });
+        pushStep(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
         continue;
       }
 
@@ -781,7 +928,7 @@
                 traceNodes.push({ p3: ODiag, name: oName, visible: isPtVisible(ODiag) });
                 traceNodes.push({ p3: M, name: mName, visible: isPtVisible(M) });
                 const xNew = getOrAddPt(hNew);
-                steps.push(`В основании <b>AC ∩ BD = ${oName}</b> и <b>${mName} = ${pa.name}${pb.name} ∩ S${oName}</b>; в <b>${d2.name}</b> луч <b>${pc.name}${mName}</b> даёт <b>${xNew.name}</b>.`);
+                pushStep(`В основании <b>AC ∩ BD = ${oName}</b> и <b>${mName} = ${pa.name}${pb.name} ∩ S${oName}</b>; в <b>${d2.name}</b> луч <b>${pc.name}${mName}</b> даёт <b>${xNew.name}</b>.`);
                 progressed = true;
                 break;
               }
@@ -791,7 +938,7 @@
         }
       }
 
-      // 5) Внутреннее проецирование (для пирамид — из S; для призм — строго вдоль рёбер!)
+      // 5) Внутреннее проецирование (для пирамид — из S; для призм — строго вдоль рёбер)
       if (projRuns < 2) {
         projRuns++;
         const candPlanes = geom.isPyramid ? [0] : geom.faces.map((_, i) => i);
@@ -851,12 +998,12 @@
           addRay(rsA, paP); addRay(rsB, pbP); addRay(paP, pbP); addRay(pa.p3, X); addRay(pbP, X);
           traceNodes.push({ p3: X, name: tName, visible: isPtVisible(X) });
           knownPts.push({ p3: X, name: tName, isUser: false });
-          steps.push(`Проецируем <b>${pa.name}→${naP}</b> и <b>${pb.name}→${nbP}</b> на <b>${fObj.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${naP}${nbP}.`);
+          pushStep(`Проецируем <b>${pa.name}→${naP}</b> и <b>${pb.name}→${nbP}</b> на <b>${fObj.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${naP}${nbP}.`);
           continue;
         }
       }
 
-      // 6) Завершение одной недостающей грани (если следы выходят за границы кадра)
+      // 6) Завершение недостающей грани
       if (poly.length >= 3) {
         let pick = null;
         for (let fi = 0; fi < geom.faces.length; fi++) {
@@ -871,8 +1018,15 @@
         }
         if (pick) {
           const ka = getOrAddPt(pick.onF[0]), kb = getOrAddPt(pick.onF[1]);
+          for (const kp of knownPts) {
+            if (isPointOnFace(kp.p3, pick.f, geom) && !onSegment3D(kp.p3, ka.p3, kb.p3)) {
+              const nearK = dist3(kp.p3, ka.p3) < dist3(kp.p3, kb.p3) ? ka.p3 : kb.p3;
+              addRay(kp.p3, nearK);
+            }
+          }
           faceLines[pick.fi] = [ka, kb];
-          steps.push(`В плоскости грани <b>${pick.f.name}</b> достраиваем отрезок сечения <b>${ka.name}${kb.name}</b>.`);
+          builtSegs.push({ a: ka.p3, b: kb.p3, visible: faceVisible[pick.fi] });
+          pushStep(`В плоскости грани <b>${pick.f.name}</b> достраиваем отрезок сечения <b>${ka.name}${kb.name}</b>.`);
           continue;
         }
       }
@@ -880,8 +1034,8 @@
       break;
     }
 
-    steps.push(`Замыкаем контур: в сечении <b>${poly.length}-угольник</b>.`);
-    return { knownPts, traces, traceNodes, steps };
+    pushStep(`Замыкаем контур: в сечении <b>${poly.length}-угольник</b>.`, true);
+    return { knownPts, traces, traceNodes, steps, snapshots };
   }
 
   // ---------- 6. Привязка ----------
@@ -933,9 +1087,65 @@
     return null;
   }
 
-  // ---------- 7. Рендер ----------
+  // ---------- 7. Рендер (Canvas + Экспорт SVG) ----------
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
+
+  function getRenderFlags() {
+    return {
+      taskOnly: document.getElementById('taskOnlyCb').checked,
+      hideWire: document.getElementById('hideWireCb').checked,
+      showTrace: document.getElementById('showTraceCb').checked,
+      showHatch: document.getElementById('showHatchCb').checked,
+      showLabels: document.getElementById('showLabelsCb').checked,
+      greenFilter: document.getElementById('greenFilterCb').checked
+    };
+  }
+
+  function resolveActiveStepData(res) {
+    const flags = getRenderFlags();
+    const { geom, faceVisible, poly, segVis, knownPts, traces, traceNodes, snapshots } = res;
+
+    if (flags.taskOnly) {
+      const userPts = state.points.map((pt, i) => ({ p3: pt.p3, name: ptNames[i] || `P${i+1}` }));
+      return {
+        drawPoly: false,
+        partialSegs: [],
+        activeTraces: [],
+        activeTraceNodes: [],
+        activePts: userPts,
+        hideWire: false
+      };
+    }
+
+    const useSnap = state.playStep !== null && snapshots.length > 0 && state.playStep >= 0 && state.playStep < snapshots.length;
+    if (useSnap) {
+      const snap = snapshots[state.playStep];
+      const traceSet = new Set(snap.traceNodes.map(t => t.name));
+      return {
+        drawPoly: snap.polyReady && poly.length >= 3,
+        partialSegs: snap.polyReady ? [] : snap.segs,
+        activeTraces: flags.showTrace ? snap.rays : [],
+        activeTraceNodes: flags.showTrace ? snap.traceNodes : [],
+        activePts: snap.pts.filter(kp => !traceSet.has(kp.name)),
+        hideWire: flags.hideWire
+      };
+    }
+
+    const traceSet = new Set(traceNodes.map(t => t.name));
+    const fullPts = knownPts.length >= 3
+      ? knownPts.filter(kp => !traceSet.has(kp.name))
+      : state.points.map((pt, i) => ({ p3: pt.p3, name: ptNames[i] || `P${i+1}` }));
+
+    return {
+      drawPoly: poly.length >= 3,
+      partialSegs: [],
+      activeTraces: flags.showTrace ? traces : [],
+      activeTraceNodes: flags.showTrace ? traceNodes : [],
+      activePts: fullPts,
+      hideWire: flags.hideWire
+    };
+  }
 
   function drawLabel(c, text, x, y, color, scale, size = 12.5) {
     c.save();
@@ -981,10 +1191,11 @@
 
   function renderToContext(targetCtx, w, h, isExport = false) {
     targetCtx.clearRect(0, 0, w, h);
+    const flags = getRenderFlags();
 
     if (state.img) {
       targetCtx.drawImage(state.img, 0, 0, w, h);
-      if (document.getElementById('greenFilterCb').checked) {
+      if (flags.greenFilter) {
         targetCtx.save();
         targetCtx.globalCompositeOperation = 'multiply';
         targetCtx.fillStyle = '#00FF41';
@@ -1011,18 +1222,15 @@
     }
 
     const res = computeSection();
-    const { geom, basis, faceVisible, edgeVisible, poly, segVis, knownPts, traces, traceNodes } = res;
+    const { geom, basis, faceVisible, edgeVisible, poly, segVis } = res;
+    const active = resolveActiveStepData(res);
     const X = p => p.x * w, Y = p => p.y * h;
     const scale = Math.max(1, w / 650);
-    const hideWire = document.getElementById('hideWireCb').checked;
-    const showTrace = document.getElementById('showTraceCb').checked;
-    const showHatch = document.getElementById('showHatchCb').checked;
-    const showLabels = document.getElementById('showLabelsCb').checked;
     const v2 = geom.v3.map(v => proj2D(v, basis));
     const hasPhoto = Boolean(state.img);
 
-    // 1. Заливка и 45° штриховка сечения рисуются ПЕРВЫМ слоем (чтобы линии за сечением были видны)
-    if (poly.length >= 3) {
+    // 1. Заливка и 45° штриховка сечения рисуются ПЕРВЫМ слоем
+    if (active.drawPoly && poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
       targetCtx.beginPath();
@@ -1031,7 +1239,7 @@
       targetCtx.fillStyle = 'rgba(0, 255, 65, 0.14)';
       targetCtx.fill();
 
-      if (showHatch) {
+      if (flags.showHatch) {
         targetCtx.save();
         targetCtx.clip();
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1055,7 +1263,7 @@
     }
 
     // 2. Каркас фигуры
-    if (!hideWire) {
+    if (!active.hideWire) {
       geom.edges.forEach(([i, j], idx) => {
         targetCtx.save();
         targetCtx.beginPath();
@@ -1073,17 +1281,17 @@
         targetCtx.restore();
       });
 
-      if (showLabels) {
+      if (flags.showLabels) {
         geom.v3.forEach((_, i) => {
           drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#9CFFAE', scale, 12);
         });
       }
     }
 
-    // 3. Вспомогательные линии (сплошные на видимых гранях / вне силуэта; пунктирные внутри объёма / на скрытых гранях)
-    if (showTrace && traces.length > 0) {
+    // 3. Вспомогательные лучи и точки следов
+    if (active.activeTraces.length > 0 || active.activeTraceNodes.length > 0) {
       targetCtx.save();
-      for (const ray of traces) {
+      for (const ray of active.activeTraces) {
         const a2 = proj2D(ray.a, basis), b2 = proj2D(ray.b, basis);
         targetCtx.beginPath();
         targetCtx.moveTo(X(a2), Y(a2));
@@ -1099,15 +1307,15 @@
         targetCtx.stroke();
       }
       targetCtx.setLineDash([]);
-      for (const tn of traceNodes) {
+      for (const tn of active.activeTraceNodes) {
         const p2 = proj2D(tn.p3, basis);
         drawSchoolPoint(targetCtx, X(p2), Y(p2), tn.visible, 4.5 * scale, tn.name, scale);
       }
       targetCtx.restore();
     }
 
-    // 4. Контур сечения поверх штриховки
-    if (poly.length >= 3) {
+    // 4. Контур сечения (полный или пошаговые отрезки)
+    if (active.drawPoly && poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
       poly2.forEach((a, i) => {
@@ -1126,15 +1334,28 @@
         targetCtx.stroke();
       });
       targetCtx.restore();
+    } else if (active.partialSegs.length > 0) {
+      targetCtx.save();
+      active.partialSegs.forEach((seg) => {
+        const a = proj2D(seg.a, basis), b = proj2D(seg.b, basis);
+        targetCtx.beginPath();
+        targetCtx.moveTo(X(a), Y(a));
+        targetCtx.lineTo(X(b), Y(b));
+        targetCtx.setLineDash(seg.visible ? [] : [7*scale, 4.5*scale]);
+        if (hasPhoto) {
+          targetCtx.lineWidth = 4.6 * scale;
+          targetCtx.strokeStyle = '#000000';
+          targetCtx.stroke();
+        }
+        targetCtx.lineWidth = 2.6 * scale;
+        targetCtx.strokeStyle = '#00FF41';
+        targetCtx.stroke();
+      });
+      targetCtx.restore();
     }
 
-    // 5. Точки сечения
-    const traceSet = new Set(traceNodes.map(t => t.name));
-    const ptsToDraw = knownPts.length >= 3
-      ? knownPts.filter(kp => !traceSet.has(kp.name))
-      : state.points.map((pt, i) => ({ p3: pt.p3, name: ptNames[i] || `P${i+1}` }));
-
-    ptsToDraw.forEach((kp) => {
+    // 5. Точки сечения (●/○)
+    active.activePts.forEach((kp) => {
       const p2 = proj2D(kp.p3, basis);
       const vis = geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(kp.p3, f, geom));
       drawSchoolPoint(targetCtx, X(p2), Y(p2), vis, 5.2 * scale, kp.name, scale);
@@ -1159,6 +1380,181 @@
     }
 
     return res;
+  }
+
+  function escXml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function buildExportSvg() {
+    const w = state.img ? state.img.naturalWidth : 1400;
+    const h = state.img ? state.img.naturalHeight : Math.round(1400 * (state.imgH / state.imgW));
+    const scale = Math.max(1, w / 650);
+    const flags = getRenderFlags();
+    const res = computeSection();
+    const { geom, basis, faceVisible, edgeVisible, poly, segVis } = res;
+    const active = resolveActiveStepData(res);
+    const X = p => +(p.x * w).toFixed(2);
+    const Y = p => +(p.y * h).toFixed(2);
+    const v2 = geom.v3.map(v => proj2D(v, basis));
+    const hasPhoto = Boolean(state.img);
+
+    const out = [];
+    out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`);
+    out.push(`<defs>`);
+    const pStep = +(11 * scale).toFixed(2);
+    out.push(
+      `<pattern id="hatch45" width="${pStep}" height="${pStep}" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">` +
+      `<line x1="0" y1="0" x2="0" y2="${pStep}" stroke="rgba(0,255,65,0.40)" stroke-width="${(1.3*scale).toFixed(2)}" />` +
+      `</pattern>`
+    );
+    out.push(`</defs>`);
+
+    // Фон
+    if (state.img) {
+      const tmp = document.createElement('canvas');
+      tmp.width = w; tmp.height = h;
+      const tCtx = tmp.getContext('2d');
+      tCtx.drawImage(state.img, 0, 0, w, h);
+      if (flags.greenFilter) {
+        tCtx.globalCompositeOperation = 'multiply';
+        tCtx.fillStyle = '#00FF41';
+        tCtx.fillRect(0, 0, w, h);
+        tCtx.globalCompositeOperation = 'source-over';
+        tCtx.fillStyle = 'rgba(0, 255, 65, 0.10)';
+        tCtx.fillRect(0, 0, w, h);
+      }
+      const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
+      out.push(`<image href="${dataUrl}" x="0" y="0" width="${w}" height="${h}" />`);
+    } else {
+      out.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="#000000" />`);
+      const step = 28 * Math.max(1, w / 840);
+      out.push(`<g stroke="rgba(0,255,65,0.09)" stroke-width="1">`);
+      for (let gx = step; gx < w; gx += step) out.push(`<line x1="${gx.toFixed(1)}" y1="0" x2="${gx.toFixed(1)}" y2="${h}" />`);
+      for (let gy = step; gy < h; gy += step) out.push(`<line x1="0" y1="${gy.toFixed(1)}" x2="${w}" y2="${gy.toFixed(1)}" />`);
+      out.push(`</g>`);
+    }
+
+    // 1. Заливка и штриховка сечения
+    if (active.drawPoly && poly.length >= 3) {
+      const poly2 = poly.map(p => proj2D(p, basis));
+      const ptsAttr = poly2.map(p => `${X(p)},${Y(p)}`).join(' ');
+      out.push(`<polygon points="${ptsAttr}" fill="rgba(0,255,65,0.14)" />`);
+      if (flags.showHatch) {
+        out.push(`<polygon points="${ptsAttr}" fill="url(#hatch45)" />`);
+      }
+    }
+
+    // 2. Каркас фигуры
+    if (!active.hideWire) {
+      geom.edges.forEach(([i, j], idx) => {
+        const dash = edgeVisible[idx] ? '' : ` stroke-dasharray="${(5*scale).toFixed(1)} ${(5*scale).toFixed(1)}"`;
+        const col = edgeVisible[idx] ? '#00C832' : '#006B1B';
+        const sw = ((edgeVisible[idx] ? 1.75 : 1.25) * scale).toFixed(2);
+        if (hasPhoto) {
+          const haloW = ((edgeVisible[idx] ? 3.4 : 2.6) * scale).toFixed(2);
+          out.push(`<line x1="${X(v2[i])}" y1="${Y(v2[i])}" x2="${X(v2[j])}" y2="${Y(v2[j])}" stroke="rgba(0,0,0,0.72)" stroke-width="${haloW}"${dash} stroke-linecap="round" />`);
+        }
+        out.push(`<line x1="${X(v2[i])}" y1="${Y(v2[i])}" x2="${X(v2[j])}" y2="${Y(v2[j])}" stroke="${col}" stroke-width="${sw}"${dash} stroke-linecap="round" />`);
+      });
+
+      if (flags.showLabels) {
+        const fSize = (12 * scale).toFixed(1);
+        const stW = (4 * scale).toFixed(1);
+        geom.v3.forEach((_, i) => {
+          const lx = (X(v2[i]) + 6 * scale).toFixed(1);
+          const ly = (Y(v2[i]) - 6 * scale).toFixed(1);
+          out.push(
+            `<text x="${lx}" y="${ly}" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="${fSize}" ` +
+            `fill="#9CFFAE" stroke="#000000" stroke-width="${stW}" paint-order="stroke">${escXml(geom.labels[i])}</text>`
+          );
+        });
+      }
+    }
+
+    const svgPoint = (p3, visible, r, label) => {
+      const p2 = proj2D(p3, basis);
+      const cx = X(p2), cy = Y(p2);
+      const rOuter = (r + 1.5 * scale).toFixed(2);
+      out.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="#000000" />`);
+      if (visible) {
+        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#00FF41" />`);
+      } else {
+        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#000000" stroke="#00FF41" stroke-width="${(2.1*scale).toFixed(2)}" />`);
+      }
+      if (label) {
+        const lx = (cx + r + 5 * scale).toFixed(1);
+        const ly = (cy - r - 3 * scale).toFixed(1);
+        out.push(
+          `<text x="${lx}" y="${ly}" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="${(12.5*scale).toFixed(1)}" ` +
+          `fill="#00FF41" stroke="#000000" stroke-width="${(4*scale).toFixed(1)}" paint-order="stroke">${escXml(label)}</text>`
+        );
+      }
+    };
+
+    // 3. Вспомогательные следы
+    for (const ray of active.activeTraces) {
+      const a2 = proj2D(ray.a, basis), b2 = proj2D(ray.b, basis);
+      const dash = ray.visible ? '' : ` stroke-dasharray="${(4.5*scale).toFixed(1)} ${(4.5*scale).toFixed(1)}"`;
+      if (hasPhoto) {
+        out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="rgba(0,0,0,0.8)" stroke-width="${(3.0*scale).toFixed(2)}"${dash} />`);
+      }
+      out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="#00E840" stroke-width="${(1.5*scale).toFixed(2)}"${dash} />`);
+    }
+    for (const tn of active.activeTraceNodes) {
+      svgPoint(tn.p3, tn.visible, 4.5 * scale, tn.name);
+    }
+
+    // 4. Контур сечения
+    const drawSegSvg = (a, b, vis) => {
+      const dash = vis ? '' : ` stroke-dasharray="${(7*scale).toFixed(1)} ${(4.5*scale).toFixed(1)}"`;
+      if (hasPhoto) {
+        out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="#000000" stroke-width="${(4.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
+      }
+      out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="#00FF41" stroke-width="${(2.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
+    };
+
+    if (active.drawPoly && poly.length >= 3) {
+      const poly2 = poly.map(p => proj2D(p, basis));
+      poly2.forEach((a, i) => drawSegSvg(a, poly2[(i + 1) % poly2.length], segVis[i]));
+    } else if (active.partialSegs.length > 0) {
+      active.partialSegs.forEach(s => drawSegSvg(proj2D(s.a, basis), proj2D(s.b, basis), s.visible));
+    }
+
+    // 5. Точки сечения
+    active.activePts.forEach((kp) => {
+      const vis = geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(kp.p3, f, geom));
+      svgPoint(kp.p3, vis, 5.2 * scale, kp.name);
+    });
+
+    out.push(`</svg>`);
+    return out.join('\n');
+  }
+
+  function updateStepPlayerUI(res) {
+    const player = document.getElementById('stepPlayer');
+    const toggleBtn = document.getElementById('stepToggleBtn');
+    const total = res.snapshots.length;
+    state.lastStepCount = total;
+
+    if (total === 0 || getRenderFlags().taskOnly) {
+      player.style.display = 'none';
+      return;
+    }
+
+    if (state.playStep !== null && state.playStep >= total) {
+      state.playStep = null;
+    }
+
+    player.style.display = 'inline-flex';
+    if (state.playStep === null) {
+      toggleBtn.textContent = `ВСЕ [${total}]`;
+      toggleBtn.classList.remove('active');
+    } else {
+      toggleBtn.textContent = `ШАГ ${state.playStep + 1}/${total}`;
+      toggleBtn.classList.add('active');
+    }
   }
 
   function draw() {
@@ -1186,25 +1582,40 @@
       ctx.fillText(`X:${state.pointerPos.x.toFixed(2)} Y:${state.pointerPos.y.toFixed(2)}`, lx + 5, ly + s - 5);
     }
 
+    updateStepPlayerUI(res);
+
     document.getElementById('modePointsBtn').textContent = `02 // ТОЧКИ [${state.points.length}/3]`;
     const polyKind = res.poly.length >= 3 ? `${res.poly.length}-УГ.` : `ТОЧЕК ${state.points.length}/3`;
     document.getElementById('hudStatus').textContent = (state.mode === 'anchors' ? 'КАРКАС · ' : 'СЕЧЕНИЕ · ') + polyKind;
     document.getElementById('polyKindTag').textContent = res.poly.length >= 3 ? `[ ${res.poly.length}-УГОЛЬНИК ]` : '[ ОЖИДАНИЕ ]';
 
     const list = document.getElementById('stepsList');
-    list.innerHTML = res.steps.length > 0
-      ? res.steps.map((s, i) => `<li><span class="trace-idx">${String(i+1).padStart(2,'0')}&gt;</span><span>${s}</span></li>`).join('')
-      : '<li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки. Новые точки построения автоматически получают имена X1, X2, X3...</span></li>';
+    if (res.steps.length > 0) {
+      list.innerHTML = res.steps.map((s, i) => {
+        let cls = '';
+        if (state.playStep !== null && res.snapshots.length > 0) {
+          if (i === state.playStep) cls = ' class="step-active"';
+          else if (i > state.playStep) cls = ' class="step-future"';
+        }
+        return `<li data-step="${i}"${cls}><span class="trace-idx">${String(i+1).padStart(2,'0')}&gt;</span><span>${s}</span></li>`;
+      }).join('');
+    } else {
+      list.innerHTML = '<li><span class="trace-idx">01&gt;</span><span>Отметьте 3 точки. Новые точки построения автоматически получают имена X1, X2, X3...</span></li>';
+    }
 
+    const canSaveApi = Boolean(apiBase && tg?.initData && state.points.length === 3);
+    const saveBtn = document.getElementById('saveToChatBtn');
     const sendBtn = document.getElementById('sendTgBtn');
-    if (tg && !tg.initData && tg.platform && tg.platform !== 'unknown' && state.points.length === 3) {
+
+    saveBtn.style.display = canSaveApi ? 'inline-flex' : 'none';
+    if (!canSaveApi && tg && !tg.initData && tg.platform && tg.platform !== 'unknown' && state.points.length === 3) {
       sendBtn.style.display = 'inline-flex';
     } else {
       sendBtn.style.display = 'none';
     }
   }
 
-  // ---------- 8. Ввод ----------
+  // ---------- 8. Ввод и события ----------
   function getNormPos(e) {
     const rect = canvas.getBoundingClientRect();
     const cx = e.touches ? e.touches[0].clientX : e.clientX;
@@ -1248,6 +1659,7 @@
         const snap = findSnap3D(pos.x, pos.y);
         if (snap) {
           state.points.push({ p3: snap.p3 });
+          state.playStep = null;
           try { tg?.HapticFeedback?.impactOccurred('light'); } catch (_) {}
           draw();
         }
@@ -1260,6 +1672,7 @@
     state.pointerPos = pos;
     if (state.dragging) {
       e.preventDefault();
+      state.playStep = null;
       if (state.dragging.type === 'anchor') {
         state.anchors[state.dragging.idx] = pos;
       } else if (state.dragging.type === 'extra') {
@@ -1351,17 +1764,57 @@
     state.preferBackFace = !state.preferBackFace;
     e.target.textContent = state.preferBackFace ? 'ГРАНЬ: ЗАД (○)' : 'ГРАНЬ: ПЕРЕД (●)';
   });
-  document.getElementById('undoPointBtn').addEventListener('click', () => { state.points.pop(); draw(); });
-  document.getElementById('clearPointsBtn').addEventListener('click', () => { state.points = []; draw(); });
+  document.getElementById('undoPointBtn').addEventListener('click', () => { state.points.pop(); state.playStep = null; draw(); });
+  document.getElementById('clearPointsBtn').addEventListener('click', () => { state.points = []; state.playStep = null; draw(); });
 
-  ['showHatchCb', 'showTraceCb', 'showLabelsCb', 'hideWireCb', 'greenFilterCb'].forEach(id =>
-    document.getElementById(id).addEventListener('change', draw)
+  ['showHatchCb', 'showTraceCb', 'showLabelsCb', 'hideWireCb', 'taskOnlyCb', 'greenFilterCb'].forEach(id =>
+    document.getElementById(id).addEventListener('change', () => {
+      if (id === 'taskOnlyCb' && document.getElementById('taskOnlyCb').checked) {
+        state.playStep = null;
+      }
+      draw();
+    })
   );
 
+  // Пошаговый плеер
+  document.getElementById('stepPrevBtn').addEventListener('click', () => {
+    const total = state.lastStepCount;
+    if (total <= 0) return;
+    if (state.playStep === null) state.playStep = total - 1;
+    else if (state.playStep > 0) state.playStep -= 1;
+    else state.playStep = null;
+    draw();
+  });
+
+  document.getElementById('stepNextBtn').addEventListener('click', () => {
+    const total = state.lastStepCount;
+    if (total <= 0) return;
+    if (state.playStep === null) state.playStep = 0;
+    else if (state.playStep < total - 1) state.playStep += 1;
+    else state.playStep = null;
+    draw();
+  });
+
+  document.getElementById('stepToggleBtn').addEventListener('click', () => {
+    if (state.lastStepCount <= 0) return;
+    state.playStep = state.playStep === null ? 0 : null;
+    draw();
+  });
+
+  document.getElementById('stepsList').addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-step]');
+    if (!li || state.lastStepCount <= 0) return;
+    const idx = Number(li.dataset.step);
+    if (!Number.isFinite(idx)) return;
+    state.playStep = state.playStep === idx ? null : idx;
+    draw();
+  });
+
+  // Экспорт PNG
   document.getElementById('downloadBtn').addEventListener('click', () => {
     const out = document.createElement('canvas');
     out.width = state.img ? state.img.naturalWidth : 1400;
-    out.height = state.img ? state.img.naturalHeight : 960;
+    out.height = state.img ? state.img.naturalHeight : Math.round(1400 * (state.imgH / state.imgW));
     renderToContext(out.getContext('2d'), out.width, out.height, true);
     const triggerDownload = (href, revoke) => {
       const link = document.createElement('a');
@@ -1382,13 +1835,91 @@
     }
   });
 
+  // Экспорт SVG
+  document.getElementById('exportSvgBtn').addEventListener('click', () => {
+    const svgStr = buildExportSvg();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = 'sechenie_construct.svg';
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  });
+
+  // Отправка доведённого чертежа в чат через Backend API (Inline Mini App)
+  document.getElementById('saveToChatBtn').addEventListener('click', async () => {
+    if (!apiBase || !tg?.initData || state.points.length < 3) return;
+    const btn = document.getElementById('saveToChatBtn');
+    const flags = getRenderFlags();
+    btn.disabled = true;
+    btn.textContent = '> ОТПРАВКА...';
+    setNetStatus('[ РЕНДЕР И ОТПРАВКА В ЧАТ... ]');
+
+    const payload = {
+      initData: tg.initData,
+      presetId: state.presetId,
+      state: {
+        shape: state.shapeKey,
+        aspect: +(state.imgW / Math.max(1, state.imgH)).toFixed(4),
+        anchors: state.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
+        extraBase: state.extraBase.map(xy => [+xy[0].toFixed(4), +xy[1].toFixed(4)]),
+        points3: state.points.map(p => p.p3.map(v => +v.toFixed(4))),
+        ptNames: ptNames.slice(0, 3),
+        flipDepth: Boolean(state.flipDepth),
+        showHatch: flags.showHatch,
+        showTrace: flags.showTrace,
+        showLabels: flags.showLabels,
+        hideWire: flags.hideWire,
+        greenFilter: flags.greenFilter
+      }
+    };
+
+    try {
+      const resp = await fetch(`${apiBase}/api/render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) {
+        const errMap = {
+          too_fast: `Слишком часто — подождите ${data.retryAfter || 4} сек.`,
+          hourly_limit_reached: 'Достигнут часовой лимит перерисовок.',
+          preset_render_limit: 'Достигнут лимит перерисовок для этого пресета.',
+          unauthorized: 'Ошибка проверки подписи Telegram initData.'
+        };
+        throw new Error(errMap[data.error] || data.error || `HTTP ${resp.status}`);
+      }
+      if (data.presetId) state.presetId = data.presetId;
+      setNetStatus('[ ОТПРАВЛЕНО В ЧАТ ]');
+      btn.textContent = '> ОТПРАВЛЕНО';
+      try { tg?.HapticFeedback?.notificationOccurred('success'); } catch (_) {}
+      setTimeout(() => {
+        btn.textContent = '> СОХРАНИТЬ_В_ЧАТ';
+        btn.disabled = false;
+      }, 1500);
+    } catch (err) {
+      setNetStatus(`[ ОШИБКА: ${err.message} ]`, true);
+      btn.textContent = '> СОХРАНИТЬ_В_ЧАТ';
+      btn.disabled = false;
+      try { tg?.HapticFeedback?.notificationOccurred('error'); } catch (_) {}
+    }
+  });
+
+  // Совместимость с запуском через ReplyKeyboard (tg.sendData)
   document.getElementById('sendTgBtn').addEventListener('click', () => {
     if (!tg) return;
     tg.sendData(JSON.stringify({
       shape: state.shapeKey,
+      aspect: +(state.imgW / Math.max(1, state.imgH)).toFixed(4),
       anchors: state.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
       extraBase: state.extraBase,
-      points3: state.points.map(p => p.p3.map(v => +v.toFixed(4)))
+      points3: state.points.map(p => p.p3.map(v => +v.toFixed(4))),
+      ptNames: ptNames.slice(0, 3),
+      flipDepth: Boolean(state.flipDepth)
     }));
   });
 
@@ -1396,6 +1927,7 @@
   draw();
   initRain();
   requestAnimationFrame(tickRain);
+  loadRemotePresetIfNeeded();
 })();
 </script>
 </body>
