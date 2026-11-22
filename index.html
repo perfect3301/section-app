@@ -214,6 +214,7 @@
       <label class="flag-lbl"><input type="checkbox" id="hideWireCb" /><span class="flag-box"></span>ТОЛЬКО_СЕЧ</label>
       <label class="flag-lbl"><input type="checkbox" id="taskOnlyCb" /><span class="flag-box"></span>ТОЛЬКО_УСЛОВИЕ</label>
       <label class="flag-lbl" id="greenFilterWrap" style="display:none;"><input type="checkbox" id="greenFilterCb" /><span class="flag-box"></span>ЗЕЛ_ФИЛЬТР</label>
+      <label class="flag-lbl" title="Режим: Тетрадь / Белый фон — для печати и презентаций"><input type="checkbox" id="paperThemeCb" /><span class="flag-box"></span>ТЕТРАДЬ</label>
     </div>
   </div>
 
@@ -234,7 +235,7 @@
 
   <div class="foot-row">
     <button class="t-btn inv" id="downloadBtn">&gt; СКАЧАТЬ_PNG</button>
-    <button class="t-btn" id="exportSvgBtn">&gt; ЭКСПОРТ_SVG</button>
+    <button class="t-btn" id="exportSvgBtn" title="Векторный SVG без водяного знака — функция PRO">&gt; ЭКСПОРТ_SVG [PRO]</button>
     <button class="t-btn inv" id="saveToChatBtn" style="display:none;">&gt; СОХРАНИТЬ_В_ЧАТ</button>
     <button class="t-btn" id="sendTgBtn" style="display:none;">&gt; В_БОТА</button>
   </div>
@@ -245,7 +246,6 @@
 
 <script>
 (() => {
-  // Базовый URL API (можно переопределить через параметр ?api=...)
   const DEFAULT_API_BASE = '';
 
   const tg = window.Telegram?.WebApp;
@@ -299,7 +299,6 @@
   }
 
   // ---------- 2. Векторная математика ----------
-  const EPS = 1e-4;
   const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
   const add = (a,b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
   const mul = (a,k) => [a[0]*k, a[1]*k, a[2]*k];
@@ -337,7 +336,7 @@
     return inside;
   }
 
-  // ---------- 3. Фигуры (синхронизировано с geometry.py) ----------
+  // ---------- 3. Фигуры (синхронизировано с CANONICAL_ANCHORS в geometry.py) ----------
   const BASE_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   function computeRegularExtraBase(N) {
@@ -351,13 +350,13 @@
   }
 
   const SHAPE_META = {
-    cube:          { title:'КУБ // PAR',      type:'prism',   N:4, hasExtra:false, defaultAnchors:[[0.28,0.73],[0.64,0.73],[0.42,0.57],[0.28,0.34]] },
+    cube:          { title:'КУБ // PAR',      type:'prism',   N:4, hasExtra:false, defaultAnchors:[[0.25,0.76],[0.63,0.76],[0.45,0.63],[0.25,0.35]] },
     quad_prism:    { title:'ПРЗ-4 // PRISM',  type:'prism',   N:4, hasExtra:true,  defaultAnchors:[[0.25,0.80],[0.64,0.80],[0.78,0.58],[0.29,0.34]] },
     tri_prism:     { title:'ПРЗ-3 // PRISM',  type:'prism',   N:3, hasExtra:false, defaultAnchors:[[0.44,0.78],[0.24,0.64],[0.76,0.66],[0.44,0.30]] },
     penta_prism:   { title:'ПРЗ-5 // PRISM',  type:'prism',   N:5, hasExtra:true,  defaultAnchors:[[0.24,0.75],[0.50,0.83],[0.76,0.75],[0.24,0.31]] },
     hex_prism:     { title:'ПРЗ-6 // PRISM',  type:'prism',   N:6, hasExtra:true,  defaultAnchors:[[0.24,0.74],[0.43,0.83],[0.69,0.79],[0.24,0.30]] },
-    tetrahedron:   { title:'ПИР-3 // TETRA',  type:'pyramid', N:3, hasExtra:false, defaultAnchors:[[0.44,0.78],[0.22,0.62],[0.78,0.64],[0.50,0.20]] },
-    quad_pyramid:  { title:'ПИР-4 // QUAD',   type:'pyramid', N:4, hasExtra:true,  defaultAnchors:[[0.28,0.76],[0.65,0.80],[0.72,0.62],[0.50,0.17]] },
+    tetrahedron:   { title:'ПИР-3 // TETRA',  type:'pyramid', N:3, hasExtra:false, defaultAnchors:[[0.42,0.81],[0.26,0.66],[0.74,0.68],[0.50,0.13]] },
+    quad_pyramid:  { title:'ПИР-4 // QUAD',   type:'pyramid', N:4, hasExtra:true,  defaultAnchors:[[0.22,0.74],[0.60,0.79],[0.75,0.62],[0.485,0.16]] },
     penta_pyramid: { title:'ПИР-5 // PENTA',  type:'pyramid', N:5, hasExtra:true,  defaultAnchors:[[0.24,0.73],[0.50,0.82],[0.76,0.73],[0.50,0.17]] },
     hex_pyramid:   { title:'ПИР-6 // HEXA',   type:'pyramid', N:6, hasExtra:true,  defaultAnchors:[[0.24,0.72],[0.43,0.82],[0.69,0.78],[0.50,0.16]] }
   };
@@ -524,7 +523,6 @@
     return true;
   }
 
-  // Fallback-загрузка из ?preset=...
   try {
     const presetParam = urlParams.get('preset');
     if (presetParam) {
@@ -606,6 +604,15 @@
     return Math.abs(dot(face.normal, sub(p3, geom.v3[face.verts[0]]))) / nLen < 2e-3;
   }
 
+  function isInsidePolyhedron(p3, geom) {
+    for (const f of geom.faces) {
+      const nLen = norm(f.normal);
+      if (nLen < 1e-8) continue;
+      if (dot(f.normal, sub(p3, geom.v3[f.verts[0]])) > 1.5e-3 * nLen) return false;
+    }
+    return true;
+  }
+
   function intersectLines3D(p1, d1, p2, d2) {
     const c = cross(d1, d2);
     const denom = dot(c, c);
@@ -643,6 +650,73 @@
     return clipLineWithPoly3D(p0, d, face.verts.map(vi => geom.v3[vi]));
   }
 
+  function clipPlaneWithPolyhedron(p0, nPlane, geom) {
+    const nl = norm(nPlane);
+    if (nl < 1e-8) return [];
+    const nu = mul(nPlane, 1 / nl);
+    const raw = [];
+    for (const [i, j] of geom.edges) {
+      const vi = geom.v3[i], vj = geom.v3[j];
+      const di = dot(nu, sub(vi, p0)), dj = dot(nu, sub(vj, p0));
+      if (Math.abs(di) < 1e-4 && Math.abs(dj) < 1e-4) raw.push(vi, vj);
+      else if (Math.abs(di) < 1e-4) raw.push(vi);
+      else if (Math.abs(dj) < 1e-4) raw.push(vj);
+      else if (di * dj < 0) raw.push(add(vi, mul(sub(vj, vi), di / (di - dj))));
+    }
+    const poly = [];
+    for (const p of raw) if (!poly.some(q => dist3(p, q) < 1.5e-3)) poly.push(p);
+    if (poly.length >= 3) {
+      let c = [0,0,0];
+      poly.forEach(p => c = add(c, p));
+      c = mul(c, 1 / poly.length);
+      const u = unit(sub(poly[0], c));
+      const v = cross(nu, u);
+      poly.sort((a, b) => Math.atan2(dot(sub(a, c), v), dot(sub(a, c), u)) - Math.atan2(dot(sub(b, c), v), dot(sub(b, c), u)));
+    }
+    return poly;
+  }
+
+  function intersectPolyWithPlane3D(polyVerts, p0, nor) {
+    const hits = [];
+    for (let k = 0; k < polyVerts.length; k++) {
+      const va = polyVerts[k], vb = polyVerts[(k + 1) % polyVerts.length];
+      const da = dot(nor, sub(va, p0)), db = dot(nor, sub(vb, p0));
+      if (Math.abs(da) < 1e-4 && Math.abs(db) < 1e-4) hits.push(va, vb);
+      else if (Math.abs(da) < 1e-4) hits.push(va);
+      else if (Math.abs(db) < 1e-4) hits.push(vb);
+      else if (da * db < 0) hits.push(add(va, mul(sub(vb, va), da / (da - db))));
+    }
+    const uniq = [];
+    for (const h of hits) if (!uniq.some(u => dist3(h, u) < 1.5e-3)) uniq.push(h);
+    return uniq;
+  }
+
+  function splitRayByPolyhedron(pa, pb, geom) {
+    const d = sub(pb, pa);
+    if (norm(d) < 2e-3) return [];
+    const ts = [0, 1];
+    for (const f of geom.faces) {
+      const denom = dot(f.normal, d);
+      if (Math.abs(denom) < 1e-6) continue;
+      const v0 = geom.v3[f.verts[0]];
+      const t = dot(f.normal, sub(v0, pa)) / denom;
+      if (t > 1e-3 && t < 1 - 1e-3) {
+        const q = add(pa, mul(d, t));
+        if (isInsidePolyhedron(q, geom)) ts.push(t);
+      }
+    }
+    ts.sort((a, b) => a - b);
+    const dedup = [ts[0]];
+    for (let i = 1; i < ts.length; i++) {
+      if (ts[i] - dedup[dedup.length - 1] > 1e-3) dedup.push(ts[i]);
+    }
+    const out = [];
+    for (let i = 0; i < dedup.length - 1; i++) {
+      out.push([add(pa, mul(d, dedup[i])), add(pa, mul(d, dedup[i + 1]))]);
+    }
+    return out;
+  }
+
   function computeSection() {
     const geom = buildShapeGeom(state.shapeKey, state.extraBase);
     const basis = getBasis();
@@ -666,19 +740,7 @@
       };
     }
 
-    const planeVal = p => dot(N, sub(p, P1));
-    const rawPts = [];
-    for (const [i, j] of geom.edges) {
-      const Vi = geom.v3[i], Vj = geom.v3[j];
-      const di = planeVal(Vi), dj = planeVal(Vj);
-      if (Math.abs(di) < EPS && Math.abs(dj) < EPS) rawPts.push(Vi, Vj);
-      else if (Math.abs(di) < EPS) rawPts.push(Vi);
-      else if (Math.abs(dj) < EPS) rawPts.push(Vj);
-      else if (di * dj < 0) rawPts.push(add(Vi, mul(sub(Vj, Vi), di / (di - dj))));
-    }
-
-    const uniq = [];
-    for (const p of rawPts) if (!uniq.some(q => dist3(p, q) < 1.5e-3)) uniq.push(p);
+    const uniq = clipPlaneWithPolyhedron(P1, N, geom);
     if (uniq.length < 3) {
       return {
         geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
@@ -686,16 +748,6 @@
         snapshots: []
       };
     }
-
-    let center = [0,0,0];
-    uniq.forEach(p => center = add(center, p));
-    center = mul(center, 1 / uniq.length);
-    const uAxis = unit(sub(uniq[0], center));
-    const vAxis = cross(unit(N), uAxis);
-    uniq.sort((a, b) => {
-      const da = sub(a, center), db = sub(b, center);
-      return Math.atan2(dot(da, vAxis), dot(da, uAxis)) - Math.atan2(dot(db, vAxis), dot(db, uAxis));
-    });
 
     const segVis = uniq.map((a, idx) => {
       const mid = mul(add(a, uniq[(idx + 1) % uniq.length]), 0.5);
@@ -709,6 +761,7 @@
   function buildNotebookSteps(geom, basis, faceVisible, givenPts, poly, nPlane, p1) {
     const knownPts = givenPts.map((g, i) => ({ p3: g.p3, name: ptNames[i] || `P${i+1}`, isUser: true }));
     const usedNames = new Set(knownPts.map(k => k.name));
+    const describedPts = new Set(knownPts.map(k => k.name));
     let xCounter = 1;
     const nextXName = () => {
       while (true) {
@@ -718,6 +771,14 @@
     };
     const getOrAddPt = (p3) => {
       for (const kp of knownPts) if (dist3(kp.p3, p3) < 2e-3) return kp;
+      const vn = nameIfExistingVertex(p3);
+      if (vn && !usedNames.has(vn)) {
+        usedNames.add(vn);
+        describedPts.add(vn);
+        const kp = { p3, name: vn, isUser: false };
+        knownPts.push(kp);
+        return kp;
+      }
       const kp = { p3, name: nextXName(), isUser: false };
       knownPts.push(kp);
       return kp;
@@ -750,7 +811,10 @@
     const traces = [];
     const builtSegs = [];
     const addRay = (pa, pb) => {
-      if (dist3(pa, pb) >= 2e-3) traces.push({ a: pa, b: pb, visible: isSegVisible(pa, pb) });
+      if (dist3(pa, pb) < 2e-3) return;
+      for (const [sa, sb] of splitRayByPolyhedron(pa, pb, geom)) {
+        traces.push({ a: sa, b: sb, visible: isSegVisible(sa, sb) });
+      }
     };
 
     const inFrame = (p3) => {
@@ -790,10 +854,81 @@
       });
     };
 
-    let projRuns = 0, didDiag = false;
+    let projRuns = 0, didDiag = false, internalRuns = 0;
     let center = [0,0,0];
     geom.v3.forEach(v => center = add(center, v));
     center = mul(center, 1 / geom.v3.length);
+
+    function tryInternalAuxiliaryPlane() {
+      if (internalRuns >= 3 || poly.length < 3 || knownPts.length < 3) return false;
+      const missingPoly = poly.filter(pt => !knownPts.some(kp => dist3(pt, kp.p3) < 2e-3));
+      for (const pTarget of missingPoly) {
+        const tEdges = geom.edges.filter(([u, v]) => onSegment3D(pTarget, geom.v3[u], geom.v3[v]));
+        for (const [u, v] of tEdges) {
+          const vu = geom.v3[u], vv = geom.v3[v];
+          if (dist3(vu, vv) < 1e-4) continue;
+          for (const pc of knownPts) {
+            if (dist3(pc.p3, pTarget) < 2e-2) continue;
+            const nb2 = cross(sub(vv, vu), sub(pc.p3, vu));
+            if (norm(nb2) < 1e-5) continue;
+            const nb2U = unit(nb2);
+            const q2 = clipPlaneWithPolyhedron(pc.p3, nb2U, geom);
+            if (q2.length < 3) continue;
+
+            for (let ia = 0; ia < knownPts.length; ia++) {
+              for (let ib = ia + 1; ib < knownPts.length; ib++) {
+                const pa = knownPts[ia], pb = knownPts[ib];
+                if (pa.name === pc.name || pb.name === pc.name) continue;
+                if (dist3(pa.p3, pb.p3) < 1e-2) continue;
+                if (norm(cross(sub(pb.p3, pa.p3), sub(pc.p3, pa.p3))) < 1e-5) continue;
+                const da = dot(nb2U, sub(pa.p3, pc.p3));
+                const db = dot(nb2U, sub(pb.p3, pc.p3));
+                if (da * db > 1e-9 || Math.abs(da - db) < 1e-4) continue;
+                const K = add(pa.p3, mul(sub(pb.p3, pa.p3), da / (da - db)));
+                if (dist3(K, pc.p3) < 1e-2 || !isInsidePolyhedron(K, geom)) continue;
+
+                const b1Dirs = [];
+                if (geom.isPrism) b1Dirs.push(...prismEdgeDirs);
+                for (const w3 of geom.v3) {
+                  const dv = sub(w3, pa.p3);
+                  if (norm(dv) > 1e-2) b1Dirs.push(dv);
+                }
+                let chosenZ = null;
+                for (const dv of b1Dirs) {
+                  const nb1 = cross(sub(pb.p3, pa.p3), dv);
+                  if (norm(nb1) < 1e-5) continue;
+                  const nb1U = unit(nb1);
+                  if (norm(cross(nb1U, nb2U)) < 1e-3) continue;
+                  const q1 = clipPlaneWithPolyhedron(pa.p3, nb1U, geom);
+                  if (q1.length < 3) continue;
+                  const zHits = intersectPolyWithPlane3D(q1, pc.p3, nb2U);
+                  if (zHits.length >= 2 && onSegment3D(K, zHits[0], zHits[1]) && isInsidePolyhedron(zHits[0], geom) && isInsidePolyhedron(zHits[1], geom)) {
+                    chosenZ = [zHits[0], zHits[1]];
+                    break;
+                  }
+                }
+                if (!chosenZ) continue;
+
+                internalRuns++;
+                let z1Name = nameIfExistingVertex(chosenZ[0]);
+                if (!z1Name) { z1Name = nextXName(); traceNodes.push({ p3: chosenZ[0], name: z1Name, visible: isPtVisible(chosenZ[0]) }); }
+                let z2Name = nameIfExistingVertex(chosenZ[1]);
+                if (!z2Name) { z2Name = nextXName(); traceNodes.push({ p3: chosenZ[1], name: z2Name, visible: isPtVisible(chosenZ[1]) }); }
+                const kName = nextXName();
+                traceNodes.push({ p3: K, name: kName, visible: isPtVisible(K) });
+                const xNew = getOrAddPt(pTarget);
+                describedPts.add(xNew.name);
+                addRay(pa.p3, pb.p3); addRay(chosenZ[0], chosenZ[1]); addRay(pc.p3, pTarget);
+                const lu = geom.labels[u], lv = geom.labels[v];
+                pushStep(`Внутренним построением: <b>${z1Name}${z2Name} ∩ ${pa.name}${pb.name} = ${kName}</b>; в <b>(${pc.name}${lu}${lv})</b> луч <b>${pc.name}${kName} ∩ ${lu}${lv} = ${xNew.name}</b>.`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+      return false;
+    }
 
     for (let iter = 0; iter < 18; iter++) {
       let progressed = false;
@@ -816,6 +951,7 @@
             const hits = clipLineWithFace(pa.p3, sub(pb.p3, pa.p3), f, geom);
             if (hitsValid(hits)) {
               const ka = getOrAddPt(hits[0]), kb = getOrAddPt(hits[1]);
+              describedPts.add(ka.name); describedPts.add(kb.name);
               faceLines[fi] = [ka, kb];
               builtSegs.push({ a: ka.p3, b: kb.p3, visible: faceVisible[fi] });
               const samePair = (pa.name === ka.name && pb.name === kb.name) || (pa.name === kb.name && pb.name === ka.name);
@@ -844,9 +980,10 @@
             const hits = clipLineWithFace(ptsInFj[0].p3, sub(kb.p3, ka.p3), fjObj, geom);
             if (hitsValid(hits)) {
               const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
+              describedPts.add(na.name); describedPts.add(nb.name);
               faceLines[fj] = [na, nb];
               builtSegs.push({ a: na.p3, b: nb.p3, visible: faceVisible[fj] });
-              pushStep(`<b>${geom.faces[fi].name}</b> ∥ <b>${fjObj.name}</b> — через <b>${ptsInFj[0].name}</b> проводим <b>${na.name}${nb.name}</b> ∥ <b>${ka.name}${kb.name}</b>.`);
+              pushStep(`Плоскости <b>(${geom.faces[fi].name})</b> и <b>(${fjObj.name})</b> параллельны ⇒ через <b>${ptsInFj[0].name}</b> проводим <b>${na.name}${nb.name}</b> ∥ <b>${ka.name}${kb.name}</b>.`);
               progressed = true;
               break;
             }
@@ -882,7 +1019,7 @@
       }
       if (bestTrace) {
         const { ka, kb, u, v, vu, vv, X, fj, fjObj, qPt, hits } = bestTrace;
-        const tName = nextXName();
+        const tName = nameIfExistingVertex(X) || nextXName();
         if (!onSegment3D(X, vu, vv)) {
           const nearSeg = dist3(X, ka.p3) < dist3(X, kb.p3) ? ka.p3 : kb.p3;
           const nearEdge = dist3(X, vu) < dist3(X, vv) ? vu : vv;
@@ -894,9 +1031,11 @@
         }
         addRay(X, qPt.p3);
         const na = getOrAddPt(hits[0]), nb = getOrAddPt(hits[1]);
+        describedPts.add(na.name); describedPts.add(nb.name);
         faceLines[fj] = [na, nb];
         builtSegs.push({ a: na.p3, b: nb.p3, visible: faceVisible[fj] });
-        pushStep(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в грани <b>${fjObj.name}</b> → <b>${na.name}${nb.name}</b>.`);
+        const placeStr = isInsidePolyhedron(X, geom) ? `грани <b>${fjObj.name}</b>` : `плоскости <b>(${fjObj.name})</b>`;
+        pushStep(`Соединяем <b>${tName}</b> и <b>${qPt.name}</b> в ${placeStr} → <b>${na.name}${nb.name}</b>.`);
         continue;
       }
 
@@ -928,6 +1067,7 @@
                 traceNodes.push({ p3: ODiag, name: oName, visible: isPtVisible(ODiag) });
                 traceNodes.push({ p3: M, name: mName, visible: isPtVisible(M) });
                 const xNew = getOrAddPt(hNew);
+                describedPts.add(xNew.name);
                 pushStep(`В основании <b>AC ∩ BD = ${oName}</b> и <b>${mName} = ${pa.name}${pb.name} ∩ S${oName}</b>; в <b>${d2.name}</b> луч <b>${pc.name}${mName}</b> даёт <b>${xNew.name}</b>.`);
                 progressed = true;
                 break;
@@ -938,10 +1078,10 @@
         }
       }
 
-      // 5) Внутреннее проецирование (для пирамид — из S; для призм — строго вдоль рёбер)
+      // 5) Центральное проецирование
       if (projRuns < 2) {
         projRuns++;
-        const candPlanes = geom.isPyramid ? [0] : geom.faces.map((_, i) => i);
+        const candPlanes = geom.faces.map((_, i) => i);
         const userPts = knownPts.filter(kp => kp.isUser);
         let bestProj = null;
 
@@ -950,20 +1090,27 @@
           const fNorm = unit(fObj.normal);
           const fV0 = geom.v3[fObj.verts[0]];
           const hasPtOnTarget = knownPts.some(kp => isPointOnFace(kp.p3, fObj, geom));
-          const dirOpts = geom.isPyramid ? [null] : prismEdgeDirs;
 
-          for (const dRay of dirOpts) {
-            if (!geom.isPyramid && Math.abs(dot(fNorm, dRay)) < 1e-3) continue;
+          let projModes;
+          if (geom.isPyramid) {
+            const apexIdx = geom.v3.length - 1;
+            const centerIndices = [apexIdx, ...Array.from({length: apexIdx}, (_, vi) => vi)].filter(vi => !fObj.verts.includes(vi));
+            projModes = centerIndices.map(vi => ({ kind: 'vertex', val: vi }));
+          } else {
+            projModes = prismEdgeDirs.filter(dRay => Math.abs(dot(fNorm, dRay)) >= 1e-3).map(dRay => ({ kind: 'dir', val: dRay }));
+          }
+
+          for (const mode of projModes) {
             const projPlane = (p) => {
               if (Math.abs(dot(fNorm, sub(p, fV0))) < 1e-3) return [...p];
-              if (geom.isPyramid) {
-                const S = geom.v3[geom.v3.length - 1];
-                const denom = dot(fNorm, sub(p, S));
+              if (mode.kind === 'vertex') {
+                const C_v = geom.v3[mode.val];
+                const denom = dot(fNorm, sub(p, C_v));
                 if (Math.abs(denom) < 1e-4) return null;
-                const t = dot(fNorm, sub(fV0, S)) / denom;
-                return t <= 0 ? null : add(S, mul(sub(p, S), t));
+                const t = dot(fNorm, sub(fV0, C_v)) / denom;
+                return t <= 0 ? null : add(C_v, mul(sub(p, C_v), t));
               }
-              return add(p, mul(dRay, dot(fNorm, sub(fV0, p)) / dot(fNorm, dRay)));
+              return add(p, mul(mode.val, dot(fNorm, sub(fV0, p)) / dot(fNorm, mode.val)));
             };
 
             for (let i = 0; i < userPts.length; i++) {
@@ -977,9 +1124,11 @@
                 if (dist3(X, pa.p3) < 1e-2 || dist3(X, pb.p3) < 1e-2) continue;
                 if (knownPts.some(kp => dist3(kp.p3, X) < 1e-2)) continue;
                 const dc = dist3(X, center);
-                const rank = (hasPtOnTarget ? 0 : 100) + dc;
+                const sBonus = (mode.kind === 'vertex' && mode.val === geom.v3.length - 1 && fIdx === 0) ? 0 : 10;
+                const inBonus = (isInsidePolyhedron(paP, geom) && isInsidePolyhedron(pbP, geom)) ? 0 : 20;
+                const rank = (hasPtOnTarget ? 0 : 100) + inBonus + sBonus + dc;
                 if (!bestProj || rank < bestProj.rank) {
-                  bestProj = { rank, fIdx, fObj, pa, pb, paP, pbP, X };
+                  bestProj = { rank, fIdx, fObj, mode, pa, pb, paP, pbP, X };
                 }
               }
             }
@@ -987,21 +1136,24 @@
         }
 
         if (bestProj) {
-          const { fObj, pa, pb, paP, pbP, X } = bestProj;
+          const { fObj, mode, pa, pb, paP, pbP, X } = bestProj;
           let naP = nameIfExistingVertex(paP);
           if (!naP) { naP = nextXName(); traceNodes.push({ p3: paP, name: naP, visible: isPtVisible(paP) }); }
           let nbP = nameIfExistingVertex(pbP);
           if (!nbP) { nbP = nextXName(); traceNodes.push({ p3: pbP, name: nbP, visible: isPtVisible(pbP) }); }
           const tName = nextXName();
-          const rsA = geom.isPyramid ? geom.v3[geom.v3.length - 1] : pa.p3;
-          const rsB = geom.isPyramid ? geom.v3[geom.v3.length - 1] : pb.p3;
+          const rsA = mode.kind === 'vertex' ? geom.v3[mode.val] : pa.p3;
+          const rsB = mode.kind === 'vertex' ? geom.v3[mode.val] : pb.p3;
           addRay(rsA, paP); addRay(rsB, pbP); addRay(paP, pbP); addRay(pa.p3, X); addRay(pbP, X);
           traceNodes.push({ p3: X, name: tName, visible: isPtVisible(X) });
           knownPts.push({ p3: X, name: tName, isUser: false });
-          pushStep(`Проецируем <b>${pa.name}→${naP}</b> и <b>${pb.name}→${nbP}</b> на <b>${fObj.name}</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${naP}${nbP}.`);
+          const pSrc = mode.kind === 'vertex' ? `из <b>${geom.labels[mode.val]}</b> ` : '';
+          pushStep(`Проецируем ${pSrc}<b>${pa.name}→${naP}</b> и <b>${pb.name}→${nbP}</b> на плоскость <b>(${fObj.name})</b> → след <b>${tName}</b> = ${pa.name}${pb.name} ∩ ${naP}${nbP}.`);
           continue;
         }
       }
+
+      if (tryInternalAuxiliaryPlane()) continue;
 
       // 6) Завершение недостающей грани
       if (poly.length >= 3) {
@@ -1018,6 +1170,7 @@
         }
         if (pick) {
           const ka = getOrAddPt(pick.onF[0]), kb = getOrAddPt(pick.onF[1]);
+          describedPts.add(ka.name); describedPts.add(kb.name);
           for (const kp of knownPts) {
             if (isPointOnFace(kp.p3, pick.f, geom) && !onSegment3D(kp.p3, ka.p3, kb.p3)) {
               const nearK = dist3(kp.p3, ka.p3) < dist3(kp.p3, kb.p3) ? ka.p3 : kb.p3;
@@ -1091,6 +1244,72 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
+  // ---------- Палитры: «Матрица» (виральный чёрно-зелёный) и «Тетрадь» (белый лист для печати) ----------
+  const PALETTE_MATRIX = {
+    paper: false, bg: '#000000', grid: 'rgba(0, 255, 65, 0.08)', polyFill: 'rgba(0, 255, 65, 0.14)',
+    hatch: 'rgba(0, 255, 65, 0.36)', hatchSvg: 'rgba(0,255,65,0.40)', edgeVis: '#00C832', edgeHid: '#006B1B',
+    vLabel: '#9CFFAE', trace: '#00E840', poly: '#00FF41', point: '#00FF41', halo: '#000000',
+    haloSoft: 'rgba(0, 0, 0, 0.75)', wmBg: 'rgba(0, 0, 0, 0.80)', wmBorder: '#00A82B', wmText: '#00FF41'
+  };
+  const PALETTE_PAPER = {
+    paper: true, bg: '#FFFFFF', grid: 'rgba(60, 110, 200, 0.16)', polyFill: 'rgba(176, 0, 32, 0.07)',
+    hatch: 'rgba(176, 0, 32, 0.38)', hatchSvg: 'rgba(176,0,32,0.40)', edgeVis: '#111111', edgeHid: '#5A5A5A',
+    vLabel: '#111111', trace: '#1F4FB0', poly: '#B00020', point: '#111111', halo: '#FFFFFF',
+    haloSoft: 'rgba(255, 255, 255, 0.85)', wmBg: 'rgba(255, 255, 255, 0.88)', wmBorder: '#5A5A5A', wmText: '#222222'
+  };
+  function curPal() {
+    const cb = document.getElementById('paperThemeCb');
+    return cb && cb.checked ? PALETTE_PAPER : PALETTE_MATRIX;
+  }
+
+  // Тариф пользователя (из /api/me): PRO — SVG и PNG без водяного знака; иначе PNG с подписью @бота
+  state.tier = { isPro: false, known: false, botUsername: '', watermark: 'SECT_3D // CONSTRUCT' };
+
+  function applyTierUi() {
+    const svgBtn = document.getElementById('exportSvgBtn');
+    if (!svgBtn) return;
+    svgBtn.innerHTML = state.tier.isPro ? '&gt; ЭКСПОРТ_SVG' : '&gt; ЭКСПОРТ_SVG [PRO]';
+    svgBtn.classList.toggle('dim', !state.tier.isPro);
+  }
+
+  async function loadTierIfPossible() {
+    if (!apiBase || !tg?.initData) { applyTierUi(); return; }
+    try {
+      const resp = await fetch(`${apiBase}/api/me`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        state.tier = {
+          isPro: Boolean(data.isPro),
+          known: true,
+          botUsername: String(data.botUsername || ''),
+          watermark: data.isPro ? null : (data.watermark || state.tier.watermark)
+        };
+      }
+    } catch (_) {}
+    applyTierUi();
+  }
+
+  function drawWatermarkCanvas(c, w, h, text) {
+    if (!text) return;
+    const P = curPal();
+    const fs = Math.max(11, Math.round(w / 66));
+    c.save();
+    c.font = `700 ${fs}px "JetBrains Mono", monospace`;
+    const tw = c.measureText(text).width;
+    const padX = Math.max(7, w / 120), padY = Math.max(4, h / 150), margin = Math.max(10, w / 70);
+    const bx1 = w - margin, by1 = h - margin;
+    const bx0 = bx1 - tw - 2 * padX, by0 = by1 - fs - 2 * padY;
+    c.fillStyle = P.wmBg;
+    c.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+    c.lineWidth = Math.max(1, w / 600);
+    c.strokeStyle = P.wmBorder;
+    c.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+    c.fillStyle = P.wmText;
+    c.textBaseline = 'top';
+    c.fillText(text, bx0 + padX, by0 + padY);
+    c.restore();
+  }
+
   function getRenderFlags() {
     return {
       taskOnly: document.getElementById('taskOnlyCb').checked,
@@ -1104,7 +1323,7 @@
 
   function resolveActiveStepData(res) {
     const flags = getRenderFlags();
-    const { geom, faceVisible, poly, segVis, knownPts, traces, traceNodes, snapshots } = res;
+    const { poly, knownPts, traces, traceNodes, snapshots } = res;
 
     if (flags.taskOnly) {
       const userPts = state.points.map((pt, i) => ({ p3: pt.p3, name: ptNames[i] || `P${i+1}` }));
@@ -1152,7 +1371,7 @@
     c.font = `700 ${size*scale}px "JetBrains Mono", monospace`;
     c.lineWidth = 4 * scale;
     c.lineJoin = 'round';
-    c.strokeStyle = '#000000';
+    c.strokeStyle = curPal().halo;
     c.strokeText(text, x, y);
     c.fillStyle = color;
     c.fillText(text, x, y);
@@ -1176,22 +1395,24 @@
   }
 
   function drawSchoolPoint(c, px, py, visible, r, label, scale) {
+    const P = curPal();
     c.save();
-    c.beginPath(); c.arc(px, py, r + 1.5 * scale, 0, Math.PI * 2); c.fillStyle = '#000000'; c.fill();
+    c.beginPath(); c.arc(px, py, r + 1.5 * scale, 0, Math.PI * 2); c.fillStyle = P.halo; c.fill();
     c.beginPath(); c.arc(px, py, r, 0, Math.PI * 2);
     if (visible) {
-      c.fillStyle = '#00FF41'; c.fill();
+      c.fillStyle = P.point; c.fill();
     } else {
-      c.fillStyle = '#000000'; c.fill();
-      c.lineWidth = 2.1 * scale; c.strokeStyle = '#00FF41'; c.stroke();
+      c.fillStyle = P.halo; c.fill();
+      c.lineWidth = 2.1 * scale; c.strokeStyle = P.point; c.stroke();
     }
     c.restore();
-    if (label) drawLabel(c, label, px + r + 5 * scale, py - r - 3 * scale, '#00FF41', scale, 12.5);
+    if (label) drawLabel(c, label, px + r + 5 * scale, py - r - 3 * scale, P.point, scale, 12.5);
   }
 
   function renderToContext(targetCtx, w, h, isExport = false) {
     targetCtx.clearRect(0, 0, w, h);
     const flags = getRenderFlags();
+    const P = curPal();
 
     if (state.img) {
       targetCtx.drawImage(state.img, 0, 0, w, h);
@@ -1206,13 +1427,13 @@
         targetCtx.restore();
       }
     } else {
-      if (isExport) {
-        targetCtx.fillStyle = '#000000';
+      if (isExport || P.paper) {
+        targetCtx.fillStyle = P.bg;
         targetCtx.fillRect(0, 0, w, h);
       }
       const step = 28 * Math.max(1, w / 840);
       targetCtx.save();
-      targetCtx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
+      targetCtx.strokeStyle = P.grid;
       targetCtx.lineWidth = 1;
       targetCtx.beginPath();
       for (let gx = step; gx < w; gx += step) { targetCtx.moveTo(gx, 0); targetCtx.lineTo(gx, h); }
@@ -1229,14 +1450,13 @@
     const v2 = geom.v3.map(v => proj2D(v, basis));
     const hasPhoto = Boolean(state.img);
 
-    // 1. Заливка и 45° штриховка сечения рисуются ПЕРВЫМ слоем
     if (active.drawPoly && poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
       targetCtx.beginPath();
       poly2.forEach((p, i) => i === 0 ? targetCtx.moveTo(X(p), Y(p)) : targetCtx.lineTo(X(p), Y(p)));
       targetCtx.closePath();
-      targetCtx.fillStyle = 'rgba(0, 255, 65, 0.14)';
+      targetCtx.fillStyle = P.polyFill;
       targetCtx.fill();
 
       if (flags.showHatch) {
@@ -1255,14 +1475,13 @@
           targetCtx.lineTo(sx + diag, minY);
         }
         targetCtx.lineWidth = 1.2 * scale;
-        targetCtx.strokeStyle = 'rgba(0, 255, 65, 0.36)';
+        targetCtx.strokeStyle = P.hatch;
         targetCtx.stroke();
         targetCtx.restore();
       }
       targetCtx.restore();
     }
 
-    // 2. Каркас фигуры
     if (!active.hideWire) {
       geom.edges.forEach(([i, j], idx) => {
         targetCtx.save();
@@ -1272,23 +1491,22 @@
         if (!edgeVisible[idx]) targetCtx.setLineDash([5*scale, 5*scale]);
         if (hasPhoto) {
           targetCtx.lineWidth = (edgeVisible[idx] ? 3.4 : 2.6) * scale;
-          targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+          targetCtx.strokeStyle = P.haloSoft;
           targetCtx.stroke();
         }
         targetCtx.lineWidth = (edgeVisible[idx] ? 1.75 : 1.25) * scale;
-        targetCtx.strokeStyle = edgeVisible[idx] ? '#00C832' : '#006B1B';
+        targetCtx.strokeStyle = edgeVisible[idx] ? P.edgeVis : P.edgeHid;
         targetCtx.stroke();
         targetCtx.restore();
       });
 
       if (flags.showLabels) {
         geom.v3.forEach((_, i) => {
-          drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, '#9CFFAE', scale, 12);
+          drawLabel(targetCtx, geom.labels[i], X(v2[i]) + 6*scale, Y(v2[i]) - 6*scale, P.vLabel, scale, 12);
         });
       }
     }
 
-    // 3. Вспомогательные лучи и точки следов
     if (active.activeTraces.length > 0 || active.activeTraceNodes.length > 0) {
       targetCtx.save();
       for (const ray of active.activeTraces) {
@@ -1299,11 +1517,11 @@
         targetCtx.setLineDash(ray.visible ? [] : [4.5*scale, 4.5*scale]);
         if (hasPhoto) {
           targetCtx.lineWidth = 3.0 * scale;
-          targetCtx.strokeStyle = 'rgba(0,0,0,0.8)';
+          targetCtx.strokeStyle = P.haloSoft;
           targetCtx.stroke();
         }
         targetCtx.lineWidth = 1.5 * scale;
-        targetCtx.strokeStyle = '#00E840';
+        targetCtx.strokeStyle = P.trace;
         targetCtx.stroke();
       }
       targetCtx.setLineDash([]);
@@ -1314,7 +1532,6 @@
       targetCtx.restore();
     }
 
-    // 4. Контур сечения (полный или пошаговые отрезки)
     if (active.drawPoly && poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       targetCtx.save();
@@ -1326,11 +1543,11 @@
         targetCtx.setLineDash(segVis[i] ? [] : [7*scale, 4.5*scale]);
         if (hasPhoto) {
           targetCtx.lineWidth = 4.6 * scale;
-          targetCtx.strokeStyle = '#000000';
+          targetCtx.strokeStyle = P.halo;
           targetCtx.stroke();
         }
         targetCtx.lineWidth = 2.6 * scale;
-        targetCtx.strokeStyle = '#00FF41';
+        targetCtx.strokeStyle = P.poly;
         targetCtx.stroke();
       });
       targetCtx.restore();
@@ -1344,17 +1561,16 @@
         targetCtx.setLineDash(seg.visible ? [] : [7*scale, 4.5*scale]);
         if (hasPhoto) {
           targetCtx.lineWidth = 4.6 * scale;
-          targetCtx.strokeStyle = '#000000';
+          targetCtx.strokeStyle = P.halo;
           targetCtx.stroke();
         }
         targetCtx.lineWidth = 2.6 * scale;
-        targetCtx.strokeStyle = '#00FF41';
+        targetCtx.strokeStyle = P.poly;
         targetCtx.stroke();
       });
       targetCtx.restore();
     }
 
-    // 5. Точки сечения (●/○)
     active.activePts.forEach((kp) => {
       const p2 = proj2D(kp.p3, basis);
       const vis = geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(kp.p3, f, geom));
@@ -1379,6 +1595,10 @@
       if (sp.tag) drawLabel(targetCtx, sp.tag, sp.x2 * w + 12*scale, sp.y2 * h + 14*scale, '#9CFFAE', scale, 11);
     }
 
+    if (isExport && !state.tier.isPro) {
+      drawWatermarkCanvas(targetCtx, w, h, state.tier.watermark || 'SECT_3D // CONSTRUCT');
+    }
+
     return res;
   }
 
@@ -1391,6 +1611,7 @@
     const h = state.img ? state.img.naturalHeight : Math.round(1400 * (state.imgH / state.imgW));
     const scale = Math.max(1, w / 650);
     const flags = getRenderFlags();
+    const P = curPal();
     const res = computeSection();
     const { geom, basis, faceVisible, edgeVisible, poly, segVis } = res;
     const active = resolveActiveStepData(res);
@@ -1406,12 +1627,11 @@
     const pStep = +(11 * scale).toFixed(2);
     out.push(
       `<pattern id="hatch45" width="${pStep}" height="${pStep}" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">` +
-      `<line x1="0" y1="0" x2="0" y2="${pStep}" stroke="rgba(0,255,65,0.40)" stroke-width="${(1.3*scale).toFixed(2)}" />` +
+      `<line x1="0" y1="0" x2="0" y2="${pStep}" stroke="${P.hatchSvg}" stroke-width="${(1.3*scale).toFixed(2)}" />` +
       `</pattern>`
     );
     out.push(`</defs>`);
 
-    // Фон
     if (state.img) {
       const tmp = document.createElement('canvas');
       tmp.width = w; tmp.height = h;
@@ -1428,33 +1648,31 @@
       const dataUrl = tmp.toDataURL('image/jpeg', 0.92);
       out.push(`<image href="${dataUrl}" x="0" y="0" width="${w}" height="${h}" />`);
     } else {
-      out.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="#000000" />`);
+      out.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="${P.bg}" />`);
       const step = 28 * Math.max(1, w / 840);
-      out.push(`<g stroke="rgba(0,255,65,0.09)" stroke-width="1">`);
+      out.push(`<g stroke="${P.grid}" stroke-width="1">`);
       for (let gx = step; gx < w; gx += step) out.push(`<line x1="${gx.toFixed(1)}" y1="0" x2="${gx.toFixed(1)}" y2="${h}" />`);
       for (let gy = step; gy < h; gy += step) out.push(`<line x1="0" y1="${gy.toFixed(1)}" x2="${w}" y2="${gy.toFixed(1)}" />`);
       out.push(`</g>`);
     }
 
-    // 1. Заливка и штриховка сечения
     if (active.drawPoly && poly.length >= 3) {
       const poly2 = poly.map(p => proj2D(p, basis));
       const ptsAttr = poly2.map(p => `${X(p)},${Y(p)}`).join(' ');
-      out.push(`<polygon points="${ptsAttr}" fill="rgba(0,255,65,0.14)" />`);
+      out.push(`<polygon points="${ptsAttr}" fill="${P.polyFill}" />`);
       if (flags.showHatch) {
         out.push(`<polygon points="${ptsAttr}" fill="url(#hatch45)" />`);
       }
     }
 
-    // 2. Каркас фигуры
     if (!active.hideWire) {
       geom.edges.forEach(([i, j], idx) => {
         const dash = edgeVisible[idx] ? '' : ` stroke-dasharray="${(5*scale).toFixed(1)} ${(5*scale).toFixed(1)}"`;
-        const col = edgeVisible[idx] ? '#00C832' : '#006B1B';
+        const col = edgeVisible[idx] ? P.edgeVis : P.edgeHid;
         const sw = ((edgeVisible[idx] ? 1.75 : 1.25) * scale).toFixed(2);
         if (hasPhoto) {
           const haloW = ((edgeVisible[idx] ? 3.4 : 2.6) * scale).toFixed(2);
-          out.push(`<line x1="${X(v2[i])}" y1="${Y(v2[i])}" x2="${X(v2[j])}" y2="${Y(v2[j])}" stroke="rgba(0,0,0,0.72)" stroke-width="${haloW}"${dash} stroke-linecap="round" />`);
+          out.push(`<line x1="${X(v2[i])}" y1="${Y(v2[i])}" x2="${X(v2[j])}" y2="${Y(v2[j])}" stroke="${P.haloSoft}" stroke-width="${haloW}"${dash} stroke-linecap="round" />`);
         }
         out.push(`<line x1="${X(v2[i])}" y1="${Y(v2[i])}" x2="${X(v2[j])}" y2="${Y(v2[j])}" stroke="${col}" stroke-width="${sw}"${dash} stroke-linecap="round" />`);
       });
@@ -1467,7 +1685,7 @@
           const ly = (Y(v2[i]) - 6 * scale).toFixed(1);
           out.push(
             `<text x="${lx}" y="${ly}" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="${fSize}" ` +
-            `fill="#9CFFAE" stroke="#000000" stroke-width="${stW}" paint-order="stroke">${escXml(geom.labels[i])}</text>`
+            `fill="${P.vLabel}" stroke="${P.halo}" stroke-width="${stW}" paint-order="stroke">${escXml(geom.labels[i])}</text>`
           );
         });
       }
@@ -1477,42 +1695,40 @@
       const p2 = proj2D(p3, basis);
       const cx = X(p2), cy = Y(p2);
       const rOuter = (r + 1.5 * scale).toFixed(2);
-      out.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="#000000" />`);
+      out.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter}" fill="${P.halo}" />`);
       if (visible) {
-        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#00FF41" />`);
+        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="${P.point}" />`);
       } else {
-        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="#000000" stroke="#00FF41" stroke-width="${(2.1*scale).toFixed(2)}" />`);
+        out.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(2)}" fill="${P.halo}" stroke="${P.point}" stroke-width="${(2.1*scale).toFixed(2)}" />`);
       }
       if (label) {
         const lx = (cx + r + 5 * scale).toFixed(1);
         const ly = (cy - r - 3 * scale).toFixed(1);
         out.push(
           `<text x="${lx}" y="${ly}" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="${(12.5*scale).toFixed(1)}" ` +
-          `fill="#00FF41" stroke="#000000" stroke-width="${(4*scale).toFixed(1)}" paint-order="stroke">${escXml(label)}</text>`
+          `fill="${P.point}" stroke="${P.halo}" stroke-width="${(4*scale).toFixed(1)}" paint-order="stroke">${escXml(label)}</text>`
         );
       }
     };
 
-    // 3. Вспомогательные следы
     for (const ray of active.activeTraces) {
       const a2 = proj2D(ray.a, basis), b2 = proj2D(ray.b, basis);
       const dash = ray.visible ? '' : ` stroke-dasharray="${(4.5*scale).toFixed(1)} ${(4.5*scale).toFixed(1)}"`;
       if (hasPhoto) {
-        out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="rgba(0,0,0,0.8)" stroke-width="${(3.0*scale).toFixed(2)}"${dash} />`);
+        out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="${P.haloSoft}" stroke-width="${(3.0*scale).toFixed(2)}"${dash} />`);
       }
-      out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="#00E840" stroke-width="${(1.5*scale).toFixed(2)}"${dash} />`);
+      out.push(`<line x1="${X(a2)}" y1="${Y(a2)}" x2="${X(b2)}" y2="${Y(b2)}" stroke="${P.trace}" stroke-width="${(1.5*scale).toFixed(2)}"${dash} />`);
     }
     for (const tn of active.activeTraceNodes) {
       svgPoint(tn.p3, tn.visible, 4.5 * scale, tn.name);
     }
 
-    // 4. Контур сечения
     const drawSegSvg = (a, b, vis) => {
       const dash = vis ? '' : ` stroke-dasharray="${(7*scale).toFixed(1)} ${(4.5*scale).toFixed(1)}"`;
       if (hasPhoto) {
-        out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="#000000" stroke-width="${(4.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
+        out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="${P.halo}" stroke-width="${(4.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
       }
-      out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="#00FF41" stroke-width="${(2.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
+      out.push(`<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="${P.poly}" stroke-width="${(2.6*scale).toFixed(2)}"${dash} stroke-linecap="round" />`);
     };
 
     if (active.drawPoly && poly.length >= 3) {
@@ -1522,7 +1738,6 @@
       active.partialSegs.forEach(s => drawSegSvg(proj2D(s.a, basis), proj2D(s.b, basis), s.visible));
     }
 
-    // 5. Точки сечения
     active.activePts.forEach((kp) => {
       const vis = geom.faces.some((f, fi) => faceVisible[fi] && isPointOnFace(kp.p3, f, geom));
       svgPoint(kp.p3, vis, 5.2 * scale, kp.name);
@@ -1767,7 +1982,7 @@
   document.getElementById('undoPointBtn').addEventListener('click', () => { state.points.pop(); state.playStep = null; draw(); });
   document.getElementById('clearPointsBtn').addEventListener('click', () => { state.points = []; state.playStep = null; draw(); });
 
-  ['showHatchCb', 'showTraceCb', 'showLabelsCb', 'hideWireCb', 'taskOnlyCb', 'greenFilterCb'].forEach(id =>
+  ['showHatchCb', 'showTraceCb', 'showLabelsCb', 'hideWireCb', 'taskOnlyCb', 'greenFilterCb', 'paperThemeCb'].forEach(id =>
     document.getElementById(id).addEventListener('change', () => {
       if (id === 'taskOnlyCb' && document.getElementById('taskOnlyCb').checked) {
         state.playStep = null;
@@ -1776,7 +1991,6 @@
     })
   );
 
-  // Пошаговый плеер
   document.getElementById('stepPrevBtn').addEventListener('click', () => {
     const total = state.lastStepCount;
     if (total <= 0) return;
@@ -1810,7 +2024,6 @@
     draw();
   });
 
-  // Экспорт PNG
   document.getElementById('downloadBtn').addEventListener('click', () => {
     const out = document.createElement('canvas');
     out.width = state.img ? state.img.naturalWidth : 1400;
@@ -1818,7 +2031,7 @@
     renderToContext(out.getContext('2d'), out.width, out.height, true);
     const triggerDownload = (href, revoke) => {
       const link = document.createElement('a');
-      link.download = 'sechenie_matrix.png';
+      link.download = curPal().paper ? 'sechenie_tetrad.png' : 'sechenie_matrix.png';
       link.href = href;
       document.body.appendChild(link);
       link.click();
@@ -1835,8 +2048,17 @@
     }
   });
 
-  // Экспорт SVG
   document.getElementById('exportSvgBtn').addEventListener('click', () => {
+    if (!state.tier.isPro) {
+      // Векторные чертежи без водяного знака — фишка PRO (репетиторы, печать, презентации)
+      setNetStatus('[ SVG-ЭКСПОРТ БЕЗ ВОДЯНОГО ЗНАКА — ФУНКЦИЯ PRO. PNG доступен бесплатно ]', true);
+      try { tg?.HapticFeedback?.notificationOccurred('warning'); } catch (_) {}
+      const bu = state.tier.botUsername;
+      if (bu && tg?.openTelegramLink) {
+        try { tg.openTelegramLink(`https://t.me/${bu}?start=buy`); } catch (_) {}
+      }
+      return;
+    }
     const svgStr = buildExportSvg();
     const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1849,7 +2071,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   });
 
-  // Отправка доведённого чертежа в чат через Backend API (Inline Mini App)
   document.getElementById('saveToChatBtn').addEventListener('click', async () => {
     if (!apiBase || !tg?.initData || state.points.length < 3) return;
     const btn = document.getElementById('saveToChatBtn');
@@ -1909,7 +2130,6 @@
     }
   });
 
-  // Совместимость с запуском через ReplyKeyboard (tg.sendData)
   document.getElementById('sendTgBtn').addEventListener('click', () => {
     if (!tg) return;
     tg.sendData(JSON.stringify({
@@ -1928,6 +2148,7 @@
   initRain();
   requestAnimationFrame(tickRain);
   loadRemotePresetIfNeeded();
+  loadTierIfPossible();
 })();
 </script>
 </body>
