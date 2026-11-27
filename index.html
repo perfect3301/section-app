@@ -69,6 +69,48 @@
     .hud-tl { top: 6px; left: 6px; }
     .hud-br { bottom: 6px; right: 6px; color: var(--g-mid); }
 
+    .view-dock {
+      background: var(--bg-panel); border: 1px solid var(--g-dim); padding: 6px 7px;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .rot-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center;
+    }
+    @media (max-width: 440px) {
+      .rot-grid { grid-template-columns: 1fr; gap: 4px; }
+    }
+    .rot-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .rot-lbl { font-size: 10px; font-weight: 700; color: var(--g-mid); width: 52px; flex-shrink: 0; letter-spacing: 0.04em; }
+    .rot-range {
+      flex: 1; min-width: 0; height: 22px; margin: 0; background: transparent;
+      -webkit-appearance: none; appearance: none; cursor: pointer;
+    }
+    .rot-range:disabled { opacity: 0.35; cursor: not-allowed; }
+    .rot-range::-webkit-slider-runnable-track {
+      height: 6px; background: var(--bg-dim); border: 1px solid var(--g-dim);
+    }
+    .rot-range::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 18px; margin-top: -7px;
+      background: var(--g-bright); border: 1px solid var(--black);
+    }
+    .rot-range::-moz-range-track {
+      height: 6px; background: var(--bg-dim); border: 1px solid var(--g-dim);
+    }
+    .rot-range::-moz-range-thumb {
+      width: 14px; height: 18px; background: var(--g-bright); border: 1px solid var(--black); border-radius: 0;
+    }
+    .rot-val {
+      font-size: 10.5px; font-weight: 700; color: var(--g-bright);
+      width: 38px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums;
+    }
+    .view-foot {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      padding-top: 4px; border-top: 1px dashed var(--g-dim);
+    }
+    .zoom-readout { font-size: 10px; font-weight: 700; color: var(--g-mid); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+    .zoom-readout b { color: var(--g-bright); }
+
     .console-dock { background: var(--bg-panel); border: 1px solid var(--g-dim); padding: 7px; display: flex; flex-direction: column; gap: 7px; }
     .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
     .mode-btn {
@@ -123,6 +165,12 @@
       color: var(--g-bright); font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
     }
     .net-status.err { border-color: #FF4141; color: #FF7A7A; }
+    .param-lbl { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--g-mid); }
+    .param-in {
+      width: 84px; height: 26px; padding: 0 5px; background: var(--black); color: var(--g-bright);
+      border: 1px solid var(--g-mid); font-family: inherit; font-size: 11px;
+    }
+    #sceneAnswer { font-weight: 700; font-size: 12px; color: var(--g-bright); }
     input[type="file"] { display: none; }
   </style>
 </head>
@@ -188,6 +236,25 @@
     <div class="hud-tag hud-br" id="hudStatus">КАРКАС [0/3]</div>
   </div>
 
+  <div class="view-dock" id="viewDock">
+    <div class="rot-grid">
+      <div class="rot-row">
+        <span class="rot-lbl">ПОВОРОТ</span>
+        <input type="range" class="rot-range" id="yawRange" min="-180" max="180" step="1" value="0" />
+        <span class="rot-val" id="yawVal">0°</span>
+      </div>
+      <div class="rot-row">
+        <span class="rot-lbl">НАКЛОН</span>
+        <input type="range" class="rot-range" id="pitchRange" min="-75" max="75" step="1" value="0" />
+        <span class="rot-val" id="pitchVal">0°</span>
+      </div>
+    </div>
+    <div class="view-foot">
+      <span class="zoom-readout">ЗУМ: <b id="zoomVal">1.0×</b> · КОЛЕСО / 2 ПАЛЬЦА</span>
+      <button class="t-btn dim" id="resetViewBtn" style="height:26px; padding:0 8px; font-size:10.5px;">&gt; СБРОС_ВИДА</button>
+    </div>
+  </div>
+
   <div class="console-dock">
     <div class="mode-switch">
       <button class="mode-btn active" id="modeAnchorBtn">01 // КАРКАС</button>
@@ -215,6 +282,16 @@
       <label class="flag-lbl"><input type="checkbox" id="taskOnlyCb" /><span class="flag-box"></span>ТОЛЬКО_УСЛОВИЕ</label>
       <label class="flag-lbl" id="greenFilterWrap" style="display:none;"><input type="checkbox" id="greenFilterCb" /><span class="flag-box"></span>ЗЕЛ_ФИЛЬТР</label>
       <label class="flag-lbl" title="Режим: Тетрадь / Белый фон — для печати и презентаций"><input type="checkbox" id="paperThemeCb" /><span class="flag-box"></span>ТЕТРАДЬ</label>
+    </div>
+  </div>
+
+  <div class="console-dock" id="scenePanel" style="display:none;">
+    <div class="sub-bar"><span id="sceneAnswer"></span></div>
+    <div class="flag-row" id="sceneParams"></div>
+    <div class="sub-bar">
+      <button class="t-btn" id="sceneRecalcBtn" style="height:30px;">&gt; ПЕРЕСЧИТАТЬ</button>
+      <label class="flag-lbl" title="Белый фон для печати"><input type="checkbox" id="scenePaperCb" /><span class="flag-box"></span>ТЕТРАДЬ</label>
+      <button class="t-btn dim" id="sceneExitBtn" style="height:30px;">&gt; РУЧНОЙ_РЕЖИМ</button>
     </div>
   </div>
 
@@ -307,6 +384,11 @@
   const norm = a => Math.hypot(a[0], a[1], a[2]);
   const dist3 = (a,b) => norm(sub(a,b));
   const unit = a => { const n = norm(a); return n < 1e-6 ? [0,0,0] : mul(a, 1/n); };
+
+  function rotZ3(v, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return [v[0]*c - v[1]*s, v[0]*s + v[1]*c, v[2]];
+  }
 
   function solve2x2(a11, a12, a21, a22, b1, b2) {
     const det = a11 * a22 - a12 * a21;
@@ -445,7 +527,7 @@
     return { labels, v3, anchors: [0, 1, 2, N], extraIndices, isPyramid: true, isPrism: false, nBase: N, edges, faces };
   }
 
-  // ---------- 4. Состояние и загрузка пресетов ----------
+  // ---------- 4. Состояние, зум/пан/3D-вращение и загрузка пресетов ----------
   let ptNames = ['M', 'N', 'P'];
   let state = {
     img: null, imgW: 840, imgH: 580,
@@ -462,8 +544,72 @@
     presetId: urlPresetId || null,
     isTaskOnly: false,
     playStep: null,
-    lastStepCount: 0
+    lastStepCount: 0,
+    // Режим просмотра универсального RenderScene (решения PoT / DSL / плагинов из бота)
+    renderScene: null,
+    sceneProgram: null,
+    sceneAnswer: ''
   };
+
+  let view = {
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    yawDeg: 0,
+    pitchDeg: 0
+  };
+
+  function syncViewUi() {
+    const yawR = document.getElementById('yawRange');
+    const pitchR = document.getElementById('pitchRange');
+    const is2d = Boolean(state.renderScene && state.renderScene.dimension === '2d');
+    if (yawR) yawR.value = String(Math.round(view.yawDeg));
+    if (pitchR) {
+      pitchR.value = String(Math.round(view.pitchDeg));
+      pitchR.disabled = is2d;
+    }
+    const yv = document.getElementById('yawVal');
+    const pv = document.getElementById('pitchVal');
+    const zv = document.getElementById('zoomVal');
+    if (yv) yv.textContent = `${Math.round(view.yawDeg)}°`;
+    if (pv) pv.textContent = is2d ? '2D' : `${Math.round(view.pitchDeg)}°`;
+    if (zv) zv.textContent = `${view.zoom.toFixed(1)}×`;
+  }
+
+  function clampPan() {
+    if (view.zoom <= 1.0) {
+      const margin = 0.35;
+      const minP = -margin, maxP = 1 - view.zoom + margin;
+      view.panX = Math.max(Math.min(view.panX, maxP), minP);
+      view.panY = Math.max(Math.min(view.panY, maxP), minP);
+    } else {
+      const pad = 0.35;
+      view.panX = Math.max(1 - view.zoom - pad, Math.min(pad, view.panX));
+      view.panY = Math.max(1 - view.zoom - pad, Math.min(pad, view.panY));
+    }
+  }
+
+  function zoomAt(newZoom, sx, sy) {
+    const z = Math.max(0.5, Math.min(6.0, newZoom));
+    const wx = (sx - view.panX) / view.zoom;
+    const wy = (sy - view.panY) / view.zoom;
+    view.zoom = z;
+    view.panX = sx - wx * z;
+    view.panY = sy - wy * z;
+    clampPan();
+    syncViewUi();
+    draw();
+  }
+
+  function resetView(doDraw = true) {
+    view.zoom = 1;
+    view.panX = 0;
+    view.panY = 0;
+    view.yawDeg = 0;
+    view.pitchDeg = 0;
+    syncViewUi();
+    if (doDraw) draw();
+  }
 
   function setNetStatus(text, isErr = false) {
     const bar = document.getElementById('netStatusBar');
@@ -492,6 +638,7 @@
     document.getElementById('anchorHint').textContent = meta.hasExtra
       ? '> Яркие [+] опора, тусклые [+] основание'
       : '> Совместите 4 прицела [+] с углами фигуры';
+    resetView(false);
   }
 
   function applyPresetPayload(data) {
@@ -520,6 +667,7 @@
       state.isTaskOnly = data.isTaskOnly;
     }
     state.playStep = null;
+    resetView(false);
     return true;
   }
 
@@ -540,6 +688,13 @@
       const resp = await fetch(`${apiBase}/api/preset?id=${encodeURIComponent(urlPresetId)}`);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
+      if (data.ok && data.renderScene) {
+        state.presetId = data.id || urlPresetId;
+        enterSceneMode(data);
+        draw();
+        setNetStatus('');
+        return;
+      }
       if (!data.ok || !applyPresetPayload(data)) {
         throw new Error(data.error || 'Некорректный пресет');
       }
@@ -578,17 +733,10 @@
     }
   }
 
-  // ---------- 5. Расчёт сечения и пошаговые снапшоты ----------
-  function getBasis() {
-    const [A, B, C, T] = state.anchors;
+  // ---------- 5. Расчёт сечения, 3D-вращение ручного каркаса и снапшоты ----------
+  function getBasisFromAnchors(ancs) {
+    const [A, B, C, T] = ancs;
     return { O: A, e1: {x: B.x-A.x, y: B.y-A.y}, e2: {x: C.x-A.x, y: C.y-A.y}, e3: {x: T.x-A.x, y: T.y-A.y} };
-  }
-
-  function proj2D(p3, basis) {
-    return {
-      x: basis.O.x + p3[0]*basis.e1.x + p3[1]*basis.e2.x + p3[2]*basis.e3.x,
-      y: basis.O.y + p3[0]*basis.e1.y + p3[1]*basis.e2.y + p3[2]*basis.e3.y
-    };
   }
 
   function getCameraDir(basis) {
@@ -596,6 +744,113 @@
     const wantSign = (basis.e3.y <= 0 ? 1 : -1) * (state.flipDepth ? -1 : 1);
     if (V[2] * wantSign < 0) V = mul(V, -1);
     return V;
+  }
+
+  function getEuclidAnchors(shapeKey) {
+    if (shapeKey === 'cube') return [[0,0,0], [1,0,0], [0,1,0], [0,0,1]];
+    const meta = SHAPE_META[shapeKey];
+    const N = meta.N;
+    const pts = Array.from({length: N}, (_, k) => [Math.cos(2*Math.PI*k/N), Math.sin(2*Math.PI*k/N), 0]);
+    const side = 2 * Math.sin(Math.PI / N);
+    if (meta.type === 'prism') return [pts[0], pts[1], pts[2], [pts[0][0], pts[0][1], side * 1.15]];
+    return [pts[0], pts[1], pts[2], [0, 0, side * 1.35]];
+  }
+
+  function getActiveManualTransform() {
+    const baseAnc = state.anchors;
+    const baseBasis = getBasisFromAnchors(baseAnc);
+    const baseCam = getCameraDir(baseBasis);
+    if (Math.abs(view.yawDeg) < 1e-4 && Math.abs(view.pitchDeg) < 1e-4) {
+      return { anchors: baseAnc, basis: baseBasis, camV: baseCam, flipDepth: state.flipDepth };
+    }
+
+    const geom = buildShapeGeom(state.shapeKey, state.extraBase);
+    const [E0, E1, E2, E3] = getEuclidAnchors(state.shapeKey);
+    const mE1 = sub(E1, E0), mE2 = sub(E2, E0), mE3 = sub(E3, E0);
+    // Матрица M_E переводит локальные координаты geom.v3 -> в евклидовы 3D-координаты E
+    const M_E = [
+      [mE1[0], mE2[0], mE3[0]],
+      [mE1[1], mE2[1], mE3[1]],
+      [mE1[2], mE2[2], mE3[2]]
+    ];
+
+    const W = state.imgW, H = state.imgH;
+    const P = baseAnc.map(a => [a.x * W, a.y * H]);
+    const d1 = [P[1][0]-P[0][0], P[1][1]-P[0][1]];
+    const d2 = [P[2][0]-P[0][0], P[2][1]-P[0][1]];
+    const d3 = [P[3][0]-P[0][0], P[3][1]-P[0][1]];
+
+    // Проекция Пи_0: находим 2 строки rx, ry в евклидовом пространстве E (Пи_0 * (E_k - E_0) = P_k - P_0)
+    const rx = solve3x3([mE1, mE2, mE3], [d1[0], d2[0], d3[0]]);
+    const ry = solve3x3([mE1, mE2, mE3], [d1[1], d2[1], d3[1]]);
+    if (!rx || !ry) return { anchors: baseAnc, basis: baseBasis, camV: baseCam, flipDepth: state.flipDepth };
+
+    // Центр фигуры в E и на экране
+    const allE = geom.v3.map(v => [
+      E0[0] + v[0]*mE1[0] + v[1]*mE2[0] + v[2]*mE3[0],
+      E0[1] + v[0]*mE1[1] + v[1]*mE2[1] + v[2]*mE3[1],
+      E0[2] + v[0]*mE1[2] + v[1]*mE2[2] + v[2]*mE3[2]
+    ]);
+    let cE = [0,0,0];
+    allE.forEach(p => cE = add(cE, p));
+    cE = mul(cE, 1 / allE.length);
+
+    let c2 = [0, 0];
+    geom.v3.forEach(v => {
+      const p2 = proj2D(v, baseBasis);
+      c2[0] += p2.x * W; c2[1] += p2.y * H;
+    });
+    c2[0] /= geom.v3.length; c2[1] /= geom.v3.length;
+
+    // Вектор к наблюдателю V_0_e в евклидовом E (направлен как baseCam)
+    const V_geom_u = unit(baseCam);
+    const V0_raw = [
+      M_E[0][0]*V_geom_u[0] + M_E[0][1]*V_geom_u[1] + M_E[0][2]*V_geom_u[2],
+      M_E[1][0]*V_geom_u[0] + M_E[1][1]*V_geom_u[1] + M_E[1][2]*V_geom_u[2],
+      M_E[2][0]*V_geom_u[0] + M_E[2][1]*V_geom_u[1] + M_E[2][2]*V_geom_u[2]
+    ];
+    let V0_e = unit(cross(rx, ry));
+    if (dot(V0_e, V0_raw) < 0) V0_e = mul(V0_e, -1);
+    const pxScale = 0.5 * (norm(rx) + norm(ry));
+
+    const yaw = view.yawDeg * Math.PI / 180;
+    const pitch = view.pitchDeg * Math.PI / 180;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+
+    const projRotatedE = (pE) => {
+      const q = rotZ3(sub(pE, cE), yaw);
+      const sx = dot(rx, q);
+      const sy = dot(ry, q);
+      const sz = dot(V0_e, q) * pxScale;
+      return { x: (c2[0] + sx) / W, y: (c2[1] + sy * cp + sz * sp) / H };
+    };
+
+    const rotAnchors = [E0, E1, E2, E3].map(projRotatedE);
+    const rotBasis = getBasisFromAnchors(rotAnchors);
+
+    // Истинный вектор взгляда в координатах geom.v3 после поворотов (yaw, pitch)
+    const ryU = unit(ry);
+    const Vq = unit(sub(mul(V0_e, cp), mul(ryU, sp)));
+    const V_world_e = rotZ3(Vq, -yaw);
+    const V_geom_eff = solve3x3(M_E, V_world_e) || getCameraDir(rotBasis);
+
+    let camRaw = cross([rotBasis.e1.x, rotBasis.e2.x, rotBasis.e3.x], [rotBasis.e1.y, rotBasis.e2.y, rotBasis.e3.y]);
+    if (dot(camRaw, V_geom_eff) < 0) camRaw = mul(camRaw, -1);
+
+    const heuristicCam = getCameraDir(rotBasis);
+    const effFlip = dot(camRaw, heuristicCam) < 0 ? !state.flipDepth : state.flipDepth;
+    return { anchors: rotAnchors, basis: rotBasis, camV: camRaw, flipDepth: effFlip };
+  }
+
+  function getBasis() {
+    return getActiveManualTransform().basis;
+  }
+
+  function proj2D(p3, basis) {
+    return {
+      x: basis.O.x + p3[0]*basis.e1.x + p3[1]*basis.e2.x + p3[2]*basis.e3.x,
+      y: basis.O.y + p3[0]*basis.e1.y + p3[1]*basis.e2.y + p3[2]*basis.e3.y
+    };
   }
 
   function isPointOnFace(p3, face, geom) {
@@ -719,22 +974,23 @@
 
   function computeSection() {
     const geom = buildShapeGeom(state.shapeKey, state.extraBase);
-    const basis = getBasis();
-    const camV = getCameraDir(basis);
+    const tf = getActiveManualTransform();
+    const basis = tf.basis;
+    const camV = tf.camV;
     const faceVisible = geom.faces.map(f => dot(f.normal, camV) > 0);
     const edgeVisible = geom.edges.map(([u, v]) =>
       geom.faces.some((f, fi) => faceVisible[fi] && f.verts.includes(u) && f.verts.includes(v))
     );
 
     if (state.points.length < 3) {
-      return { geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: [], snapshots: [] };
+      return { geom, anchors: tf.anchors, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [], steps: [], snapshots: [] };
     }
 
     const [P1, P2, P3] = state.points.map(p => p.p3);
     const N = cross(sub(P2, P1), sub(P3, P1));
     if (norm(N) < 1e-6) {
       return {
-        geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
+        geom, anchors: tf.anchors, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
         steps: ['ERR: Точки лежат на одной прямой — сдвиньте одну из точек.'],
         snapshots: []
       };
@@ -743,7 +999,7 @@
     const uniq = clipPlaneWithPolyhedron(P1, N, geom);
     if (uniq.length < 3) {
       return {
-        geom, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
+        geom, anchors: tf.anchors, basis, faceVisible, edgeVisible, poly: [], segVis: [], knownPts: [], traces: [], traceNodes: [],
         steps: ['EMPTY: Плоскость не даёт сечения внутри фигуры.'],
         snapshots: []
       };
@@ -755,7 +1011,7 @@
     });
 
     const res = buildNotebookSteps(geom, basis, faceVisible, state.points, uniq, N, P1);
-    return { geom, basis, faceVisible, edgeVisible, poly: uniq, segVis, ...res };
+    return { geom, anchors: tf.anchors, basis, faceVisible, edgeVisible, poly: uniq, segVis, ...res };
   }
 
   function buildNotebookSteps(geom, basis, faceVisible, givenPts, poly, nPlane, p1) {
@@ -768,6 +1024,10 @@
         const cand = `X${xCounter++}`;
         if (!usedNames.has(cand)) { usedNames.add(cand); return cand; }
       }
+    };
+    const nameIfExistingVertex = (p3) => {
+      for (let i = 0; i < geom.v3.length; i++) if (dist3(geom.v3[i], p3) < 2e-3) return geom.labels[i];
+      return null;
     };
     const getOrAddPt = (p3) => {
       for (const kp of knownPts) if (dist3(kp.p3, p3) < 2e-3) return kp;
@@ -782,10 +1042,6 @@
       const kp = { p3, name: nextXName(), isUser: false };
       knownPts.push(kp);
       return kp;
-    };
-    const nameIfExistingVertex = (p3) => {
-      for (let i = 0; i < geom.v3.length; i++) if (dist3(geom.v3[i], p3) < 2e-3) return geom.labels[i];
-      return null;
     };
 
     const v2All = geom.v3.map(v => proj2D(v, basis));
@@ -933,7 +1189,6 @@
     for (let iter = 0; iter < 18; iter++) {
       let progressed = false;
 
-      // 1) Две известные точки в одной грани
       for (let fi = 0; fi < geom.faces.length; fi++) {
         if (faceLines[fi]) continue;
         const f = geom.faces[fi];
@@ -967,7 +1222,6 @@
       }
       if (progressed) continue;
 
-      // 2) Параллельные грани
       for (let fj = 0; fj < geom.faces.length; fj++) {
         if (faceLines[fj]) continue;
         const fjObj = geom.faces[fj];
@@ -993,7 +1247,6 @@
       }
       if (progressed) continue;
 
-      // 3) Метод следов
       let bestTrace = null;
       for (const [fiStr, [ka, kb]] of Object.entries(faceLines)) {
         const fi = Number(fiStr);
@@ -1039,7 +1292,6 @@
         continue;
       }
 
-      // 4) Диагональные плоскости для 4-уг. пирамиды
       if (!didDiag && geom.isPyramid && geom.nBase === 4) {
         didDiag = true;
         const [vA, vB, vC, vD, vS] = geom.v3;
@@ -1078,7 +1330,6 @@
         }
       }
 
-      // 5) Центральное проецирование
       if (projRuns < 2) {
         projRuns++;
         const candPlanes = geom.faces.map((_, i) => i);
@@ -1155,7 +1406,6 @@
 
       if (tryInternalAuxiliaryPlane()) continue;
 
-      // 6) Завершение недостающей грани
       if (poly.length >= 3) {
         let pick = null;
         for (let fi = 0; fi < geom.faces.length; fi++) {
@@ -1194,19 +1444,20 @@
   // ---------- 6. Привязка ----------
   function findSnap3D(mx, my) {
     const geom = buildShapeGeom(state.shapeKey, state.extraBase);
-    const basis = getBasis();
-    const camV = getCameraDir(basis);
+    const tf = getActiveManualTransform();
+    const basis = tf.basis;
+    const camV = tf.camV;
     const v2 = geom.v3.map(v => proj2D(v, basis));
     const px = x => x * state.imgW, py = y => y * state.imgH;
     const mPx = px(mx), mPy = py(my);
 
     for (let i = 0; i < v2.length; i++) {
-      if (Math.hypot(px(v2[i].x) - mPx, py(v2[i].y) - mPy) < 17) {
+      if (Math.hypot(px(v2[i].x) - mPx, py(v2[i].y) - mPy) < 17 / view.zoom) {
         return { p3: [...geom.v3[i]], x2: v2[i].x, y2: v2[i].y, tag: geom.labels[i] };
       }
     }
 
-    let bestEdge = null, bestDist = 16;
+    let bestEdge = null, bestDist = 16 / view.zoom;
     for (const [i, j] of geom.edges) {
       const ax = px(v2[i].x), ay = py(v2[i].y), bx = px(v2[j].x), by = py(v2[j].y);
       const dx = bx - ax, dy = by - ay, len2 = dx*dx + dy*dy;
@@ -1244,25 +1495,522 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
 
-  // ---------- Палитры: «Матрица» (виральный чёрно-зелёный) и «Тетрадь» (белый лист для печати) ----------
   const PALETTE_MATRIX = {
     paper: false, bg: '#000000', grid: 'rgba(0, 255, 65, 0.08)', polyFill: 'rgba(0, 255, 65, 0.14)',
     hatch: 'rgba(0, 255, 65, 0.36)', hatchSvg: 'rgba(0,255,65,0.40)', edgeVis: '#00C832', edgeHid: '#006B1B',
     vLabel: '#9CFFAE', trace: '#00E840', poly: '#00FF41', point: '#00FF41', halo: '#000000',
-    haloSoft: 'rgba(0, 0, 0, 0.75)', wmBg: 'rgba(0, 0, 0, 0.80)', wmBorder: '#00A82B', wmText: '#00FF41'
+    haloSoft: 'rgba(0, 0, 0, 0.75)', wmBg: 'rgba(0, 0, 0, 0.80)', wmBorder: '#00A82B', wmText: '#00FF41',
+    planeFill: 'rgba(0, 255, 65, 0.08)', planeFill2: 'rgba(156, 255, 174, 0.08)'
   };
   const PALETTE_PAPER = {
     paper: true, bg: '#FFFFFF', grid: 'rgba(60, 110, 200, 0.16)', polyFill: 'rgba(176, 0, 32, 0.07)',
     hatch: 'rgba(176, 0, 32, 0.38)', hatchSvg: 'rgba(176,0,32,0.40)', edgeVis: '#111111', edgeHid: '#5A5A5A',
     vLabel: '#111111', trace: '#1F4FB0', poly: '#B00020', point: '#111111', halo: '#FFFFFF',
-    haloSoft: 'rgba(255, 255, 255, 0.85)', wmBg: 'rgba(255, 255, 255, 0.88)', wmBorder: '#5A5A5A', wmText: '#222222'
+    haloSoft: 'rgba(255, 255, 255, 0.85)', wmBg: 'rgba(255, 255, 255, 0.88)', wmBorder: '#5A5A5A', wmText: '#222222',
+    planeFill: 'rgba(31, 79, 176, 0.09)', planeFill2: 'rgba(60, 140, 60, 0.09)'
   };
   function curPal() {
-    const cb = document.getElementById('paperThemeCb');
+    const cb = document.getElementById(state.renderScene ? 'scenePaperCb' : 'paperThemeCb');
     return cb && cb.checked ? PALETTE_PAPER : PALETTE_MATRIX;
   }
 
-  // Тариф пользователя (из /api/me): PRO — SVG и PNG без водяного знака; иначе PNG с подписью @бота
+  // ---------- RenderScene: проекция, 3D-вращение и пересчёт видимости ----------
+  function sceneRawProj(sc, p) {
+    if (sc.dimension === '3d') {
+      const c = sc.camera, x = p[0] || 0, y = p[1] || 0, z = p[2] || 0;
+      return [c.origin[0] + x * c.e1[0] + y * c.e2[0] + z * c.e3[0], c.origin[1] + x * c.e1[1] + y * c.e2[1] + z * c.e3[1]];
+    }
+    return [p[0], -p[1]];
+  }
+  function sceneViewDir(sc) {
+    if (sc._overrideViewDir) return sc._overrideViewDir;
+    const c = sc.camera;
+    const r1 = [c.e1[0], c.e2[0], c.e3[0]], r2 = [c.e1[1], c.e2[1], c.e3[1]];
+    let d = [r1[1] * r2[2] - r1[2] * r2[1], r1[2] * r2[0] - r1[0] * r2[2], r1[0] * r2[1] - r1[1] * r2[0]];
+    const n = Math.hypot(d[0], d[1], d[2]) || 1;
+    d = d.map(v => v / n);
+    if (d[2] < 0 || (Math.abs(d[2]) < 1e-9 && d[1] > 0)) d = d.map(v => -v);
+    return d;
+  }
+  function sceneCircle3d(center, normal, r, n = 96) {
+    let nr = normal || [0, 0, 1];
+    const nl = Math.hypot(nr[0], nr[1], nr[2]) || 1;
+    nr = nr.map(v => v / nl);
+    const hp = Math.abs(nr[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let u = [nr[1] * hp[2] - nr[2] * hp[1], nr[2] * hp[0] - nr[0] * hp[2], nr[0] * hp[1] - nr[1] * hp[0]];
+    const ul = Math.hypot(u[0], u[1], u[2]) || 1;
+    u = u.map(v => v / ul);
+    const v = [nr[1] * u[2] - nr[2] * u[1], nr[2] * u[0] - nr[0] * u[2], nr[0] * u[1] - nr[1] * u[0]];
+    const out = [];
+    for (let k = 0; k <= n; k++) {
+      const t = 2 * Math.PI * k / n, ct = Math.cos(t), st = Math.sin(t);
+      out.push([0, 1, 2].map(i => center[i] + r * (ct * u[i] + st * v[i])));
+    }
+    return out;
+  }
+  function sceneCurve2d(cv) {
+    const r2 = (cv.radius2 === null || cv.radius2 === undefined) ? cv.radius : cv.radius2;
+    const a0 = cv.kind === 'arc_2d' ? cv.start_deg : 0, a1 = cv.kind === 'arc_2d' ? cv.end_deg : 360;
+    const rot = (cv.rotation_deg || 0) * Math.PI / 180;
+    const out = [];
+    for (let k = 0; k <= 48; k++) {
+      const t = (a0 + (a1 - a0) * k / 48) * Math.PI / 180;
+      const x = cv.radius * Math.cos(t), y = r2 * Math.sin(t);
+      out.push([cv.center[0] + x * Math.cos(rot) - y * Math.sin(rot), cv.center[1] + x * Math.sin(rot) + y * Math.cos(rot)]);
+    }
+    return out;
+  }
+  function sceneCurvePoints(sc, cv) {
+    if (cv.kind === 'right_angle_mark') return [cv.center];
+    if (sc.dimension === '3d') return sceneCircle3d(cv.center, cv.normal, cv.radius, 48);
+    return sceneCurve2d(cv);
+  }
+
+  function extractConvexHullFaces(sc) {
+    if (sc._hullChecked) return sc._hullFaces;
+    sc._hullChecked = true;
+    sc._hullFaces = null;
+    if (sc.dimension !== '3d' || (sc.curves && sc.curves.length > 0)) return null;
+    const edgeSegs = (sc.segments || []).filter(s => s.style === 'edge_vis' || s.style === 'edge_hid');
+    if (edgeSegs.length < 6) return null;
+
+    const pts = [];
+    const addUniq = (p) => {
+      if (!pts.some(q => dist3(p, q) < 1e-5)) pts.push([p[0], p[1], p[2]]);
+    };
+    edgeSegs.forEach(s => { addUniq(s.a); addUniq(s.b); });
+    if (pts.length < 4 || pts.length > 24) return null;
+
+    let minC = [Infinity, Infinity, Infinity], maxC = [-Infinity, -Infinity, -Infinity];
+    pts.forEach(p => { for (let k = 0; k < 3; k++) { minC[k] = Math.min(minC[k], p[k]); maxC[k] = Math.max(maxC[k], p[k]); } });
+    const span = Math.max(1e-6, ...[0,1,2].map(k => maxC[k] - minC[k]));
+    const tol = 1e-5 * span;
+
+    const faces = [];
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        for (let k = j + 1; k < pts.length; k++) {
+          let n = cross(sub(pts[j], pts[i]), sub(pts[k], pts[i]));
+          const nl = norm(n);
+          if (nl < 1e-7 * span * span) continue;
+          n = mul(n, 1 / nl);
+          const dists = pts.map(p => dot(n, sub(p, pts[i])));
+          const allLe = dists.every(d => d <= tol);
+          const allGe = dists.every(d => d >= -tol);
+          if (!allLe && !allGe) continue;
+          if (!allLe) n = mul(n, -1);
+          const off = dot(n, pts[i]);
+          if (faces.some(f => dot(f.n, n) > 0.9999 && Math.abs(f.off - off) < tol)) continue;
+          faces.push({ p0: pts[i], n, off, tol });
+        }
+      }
+    }
+    if (faces.length < 4) return null;
+    const onF = (p, f) => Math.abs(dot(f.n, sub(p, f.p0))) <= f.tol;
+    const allEdgesMatch = edgeSegs.every(s => faces.some(f => onF(s.a, f) && onF(s.b, f)));
+    if (!allEdgesMatch) return null;
+    sc._hullFaces = faces;
+    return faces;
+  }
+
+  function getSceneCenterAndRadius(sc) {
+    if (sc._boundsCache) return sc._boundsCache;
+    const pts = [];
+    (sc.vertices || []).forEach(v => pts.push(v.pos));
+    (sc.segments || []).forEach(s => { pts.push(s.a); pts.push(s.b); });
+    (sc.polygons || []).forEach(pg => pg.pts.forEach(p => pts.push(p)));
+    (sc.curves || []).forEach(cv => sceneCurvePoints(sc, cv).forEach(p => pts.push(p)));
+    if (!pts.length) { sc._boundsCache = { c: [0,0,0], r: 1 }; return sc._boundsCache; }
+    const dim = sc.dimension === '3d' ? 3 : 2;
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    pts.forEach(p => {
+      for (let k = 0; k < dim; k++) {
+        const val = p[k] || 0;
+        if (val < min[k]) min[k] = val;
+        if (val > max[k]) max[k] = val;
+      }
+    });
+    const c = [0,1,2].map(k => k < dim ? 0.5 * (min[k] + max[k]) : 0);
+    let r = 1e-6;
+    pts.forEach(p => {
+      const d = dim === 3 ? dist3(p, c) : Math.hypot((p[0]||0) - c[0], (p[1]||0) - c[1]);
+      if (d > r) r = d;
+    });
+    sc._boundsCache = { c, r };
+    return sc._boundsCache;
+  }
+
+  function getRotatedScene(sc, yawDeg, pitchDeg) {
+    if (!sc || (Math.abs(yawDeg) < 1e-4 && Math.abs(pitchDeg) < 1e-4)) return sc;
+    const yaw = yawDeg * Math.PI / 180;
+    const { c } = getSceneCenterAndRadius(sc);
+
+    if (sc.dimension === '2d') {
+      const rot2 = (p) => {
+        const dx = p[0] - c[0], dy = p[1] - c[1];
+        const co = Math.cos(yaw), si = Math.sin(yaw);
+        return [c[0] + dx * co - dy * si, c[1] + dx * si + dy * co];
+      };
+      return {
+        ...sc,
+        camera: { ...sc.camera, bounds_2d: null },
+        vertices: (sc.vertices || []).map(v => ({ ...v, pos: rot2(v.pos) })),
+        segments: (sc.segments || []).map(s => ({ ...s, a: rot2(s.a), b: rot2(s.b) })),
+        polygons: (sc.polygons || []).map(pg => ({ ...pg, pts: pg.pts.map(rot2) })),
+        curves: (sc.curves || []).map(cv => ({
+          ...cv,
+          center: rot2(cv.center),
+          rotation_deg: (cv.rotation_deg || 0) + yawDeg,
+          p1: cv.p1 ? rot2(cv.p1) : null,
+          p2: cv.p2 ? rot2(cv.p2) : null
+        }))
+      };
+    }
+
+    const pitch = pitchDeg * Math.PI / 180;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const cam = sc.camera;
+    const rx = [cam.e1[0], cam.e2[0], cam.e3[0]];
+    const ry = [cam.e1[1], cam.e2[1], cam.e3[1]];
+    const V0 = sceneViewDir(sc);
+    const pxScale = 0.5 * (norm(rx) + norm(ry)) || 1;
+
+    const projAxis = (axisVec) => {
+      const q = rotZ3(axisVec, yaw);
+      const sx = dot(rx, q);
+      const sy = dot(ry, q);
+      const sz = dot(V0, q) * pxScale;
+      return [sx, sy * cp + sz * sp];
+    };
+
+    const newCam = {
+      origin: [0, 0],
+      e1: projAxis([1, 0, 0]),
+      e2: projAxis([0, 1, 0]),
+      e3: projAxis([0, 0, 1]),
+      bounds_2d: null
+    };
+
+    const ryU = unit(ry);
+    const Vq = unit(sub(mul(V0, cp), mul(ryU, sp)));
+    const vDir = unit(rotZ3(Vq, -yaw));
+
+    let segments = sc.segments || [];
+    let vertices = sc.vertices || [];
+    let curves = sc.curves || [];
+
+    const hull = extractConvexHullFaces(sc);
+    if (hull) {
+      const faceVis = hull.map(f => dot(f.n, vDir) > 1e-6);
+      const onF = (p, f) => Math.abs(dot(f.n, sub(p, f.p0))) <= f.tol;
+      segments = segments.map(s => {
+        if (s.style === 'edge_vis' || s.style === 'edge_hid') {
+          const vis = hull.some((f, fi) => faceVis[fi] && onF(s.a, f) && onF(s.b, f));
+          return { ...s, visible: vis, style: vis ? 'edge_vis' : 'edge_hid' };
+        }
+        if (s.style === 'section') {
+          const owners = hull.map((f, fi) => (onF(s.a, f) && onF(s.b, f)) ? faceVis[fi] : null).filter(v => v !== null);
+          if (owners.length > 0) return { ...s, visible: owners.some(Boolean) };
+        }
+        return s;
+      });
+      vertices = vertices.map(v => {
+        const owners = hull.map((f, fi) => onF(v.pos, f) ? faceVis[fi] : null).filter(x => x !== null);
+        return owners.length > 0 ? { ...v, visible: owners.some(Boolean) } : v;
+      });
+    } else if (curves.length > 0) {
+      // Для шара/цилиндра/конуса обновляем контуры, ориентированные на камеру
+      const hideBackCircles = curves.filter(cv => cv.kind === 'circle_3d' && cv.hide_back);
+      curves = curves.map(cv => {
+        if (cv.kind === 'circle_3d' && !cv.hide_back && hideBackCircles.some(hc => dist3(hc.center, cv.center) < 1e-4 && Math.abs(hc.radius - cv.radius) < 1e-4)) {
+          return { ...cv, normal: vDir };
+        }
+        return cv;
+      });
+    }
+
+    return { ...sc, camera: newCam, segments, vertices, curves, _overrideViewDir: vDir, _origScene: sc };
+  }
+
+  function sceneProjector(sc, w, h) {
+    const rawSc = sc._origScene || sc;
+    const pts = [];
+    (sc.vertices || []).forEach(v => pts.push(v.pos));
+    (sc.segments || []).forEach(s => { pts.push(s.a); pts.push(s.b); });
+    (sc.polygons || []).forEach(pg => pg.pts.forEach(p => pts.push(p)));
+    (sc.curves || []).forEach(cv => sceneCurvePoints(sc, cv).forEach(p => pts.push(p)));
+    let raw = pts.map(p => sceneRawProj(sc, p));
+    if (!raw.length) raw = [[0, 0], [1, 1]];
+    let xs = raw.map(p => p[0]), ys = raw.map(p => p[1]);
+    if (sc.dimension === '2d' && sc.camera.bounds_2d) {
+      const [x0, y0, x1, y1] = sc.camera.bounds_2d;
+      xs = [x0, x1]; ys = [-y1, -y0];
+    }
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const bw = Math.max(1e-9, maxX - minX), bh = Math.max(1e-9, maxY - minY);
+    const m = 0.08;
+    let s = Math.min(w * (1 - 2 * m) / bw, h * (1 - 2 * m) / bh);
+    let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+
+    if (sc._origScene && sc.dimension === '3d') {
+      // Стабилизируем центр и масштаб при 3D-вращении, чтобы фигура не «прыгала» в размерах
+      const { c, r } = getSceneCenterAndRadius(rawSc);
+      const c2 = sceneRawProj(sc, c);
+      cx = c2[0]; cy = c2[1];
+      const cCam = sc.camera;
+      const maxGain = Math.max(
+        Math.hypot(cCam.e1[0], cCam.e1[1]),
+        Math.hypot(cCam.e2[0], cCam.e2[1]),
+        Math.hypot(cCam.e3[0], cCam.e3[1])
+      ) || 1;
+      const safeScale = Math.min(w * (1 - 2 * m), h * (1 - 2 * m)) / Math.max(1e-6, 2 * r * maxGain * 1.05);
+      const baseP = sceneProjector(rawSc, w, h);
+      s = Math.min(baseP.scale, Math.max(safeScale, s * 0.85));
+    }
+
+    const tx = w / 2 - cx * s, ty = h / 2 - cy * s;
+    const P = p => { const r = sceneRawProj(sc, p); return [r[0] * s + tx, r[1] * s + ty]; };
+    P.aspect = bh / bw;
+    P.scale = s;
+    return P;
+  }
+
+  function sceneStyle(Pl, style, scale) {
+    if (style === 'section' || style === 'main') return { col: Pl.poly, lw: 2.6 * scale };
+    if (style === 'aux') return { col: Pl.trace, lw: 1.5 * scale };
+    if (style === 'ref_line') return { col: Pl.trace, lw: 1.0 * scale };
+    if (style === 'edge_hid') return { col: Pl.edgeHid, lw: 1.25 * scale };
+    return { col: Pl.edgeVis, lw: 1.75 * scale };
+  }
+
+  function renderSceneToContext(c, w, h, isExport) {
+    const sc = getRotatedScene(state.renderScene, view.yawDeg, view.pitchDeg);
+    const Pl = curPal(), scale = Math.max(1, w / 650);
+    const P = sceneProjector(sc, w, h);
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = Pl.bg; c.fillRect(0, 0, w, h);
+    const gs = 28 * Math.max(1, w / 840);
+    c.save(); c.strokeStyle = Pl.grid; c.lineWidth = 1; c.beginPath();
+    for (let gx = gs; gx < w; gx += gs) { c.moveTo(gx, 0); c.lineTo(gx, h); }
+    for (let gy = gs; gy < h; gy += gs) { c.moveTo(0, gy); c.lineTo(w, gy); }
+    c.stroke(); c.restore();
+
+    const applyViewTransform = !isExport && (view.zoom !== 1 || view.panX !== 0 || view.panY !== 0);
+    if (applyViewTransform) {
+      c.save();
+      c.translate(view.panX * w, view.panY * h);
+      c.scale(view.zoom, view.zoom);
+    }
+
+    (sc.polygons || []).forEach(pg => {
+      const pts = pg.pts.map(P);
+      if (pts.length < 3) return;
+      c.save(); c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath();
+      c.fillStyle = pg.style === 'section' ? Pl.polyFill : (pg.style === 'plane2' ? Pl.planeFill2 : Pl.planeFill);
+      c.fill();
+      if (pg.style === 'section' && pg.hatch) {
+        c.clip();
+        const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+        const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), dg = y1 - y0, st = 11 * scale;
+        c.beginPath();
+        for (let sx = x0 - dg; sx <= x1 + st; sx += st) { c.moveTo(sx, y1); c.lineTo(sx + dg, y0); }
+        c.lineWidth = 1.2 * scale; c.strokeStyle = Pl.hatch; c.stroke();
+      }
+      c.restore();
+    });
+    (sc.segments || []).forEach(sg => {
+      const a = P(sg.a), b = P(sg.b), st = sceneStyle(Pl, sg.style, scale);
+      const hidden = !sg.visible || sg.style === 'edge_hid' || sg.style === 'ref_line';
+      c.save(); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]);
+      c.setLineDash(hidden ? [6 * scale, 5 * scale] : []);
+      if (sg.style === 'section' || sg.style === 'main') { c.lineWidth = st.lw + 2 * scale; c.strokeStyle = Pl.halo; c.stroke(); }
+      c.lineWidth = st.lw; c.strokeStyle = st.col; c.stroke(); c.restore();
+    });
+    const viewDir = sc.dimension === '3d' ? sceneViewDir(sc) : null;
+    (sc.curves || []).forEach(cv => {
+      const st = sceneStyle(Pl, cv.style, scale);
+      c.save(); c.strokeStyle = st.col; c.lineWidth = st.lw;
+      if (cv.kind === 'right_angle_mark' && cv.p1 && cv.p2) {
+        const o = P(cv.center), u0 = P(cv.p1), v0 = P(cv.p2), sz = Math.max(9, w / 75);
+        const nu = Math.hypot(u0[0] - o[0], u0[1] - o[1]) || 1, nv = Math.hypot(v0[0] - o[0], v0[1] - o[1]) || 1;
+        const u = [(u0[0] - o[0]) / nu * sz, (u0[1] - o[1]) / nu * sz], v = [(v0[0] - o[0]) / nv * sz, (v0[1] - o[1]) / nv * sz];
+        c.beginPath(); c.moveTo(o[0] + u[0], o[1] + u[1]); c.lineTo(o[0] + u[0] + v[0], o[1] + u[1] + v[1]); c.lineTo(o[0] + v[0], o[1] + v[1]); c.stroke();
+      } else if (sc.dimension === '3d') {
+        const pts3 = sceneCircle3d(cv.center, cv.normal, cv.radius, 120);
+        for (let i = 0; i + 1 < pts3.length; i++) {
+          const mid = [0, 1, 2].map(k => (pts3[i][k] + pts3[i + 1][k]) / 2 - cv.center[k]);
+          const back = cv.hide_back && viewDir && (mid[0] * viewDir[0] + mid[1] * viewDir[1] + mid[2] * viewDir[2]) < 0;
+          const a = P(pts3[i]), b = P(pts3[i + 1]);
+          c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]);
+          c.setLineDash(back ? [5 * scale, 5 * scale] : []);
+          c.strokeStyle = back ? Pl.edgeHid : st.col; c.stroke();
+        }
+      } else {
+        const pts = sceneCurve2d(cv).map(P);
+        c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+      }
+      c.restore();
+    });
+    (sc.vertices || []).forEach(v => {
+      const p = P(v.pos), isV = v.role === 'vertex', r = (isV ? 3 : 5) * scale;
+      c.save();
+      c.beginPath(); c.arc(p[0], p[1], r + 1.5 * scale, 0, Math.PI * 2); c.fillStyle = Pl.halo; c.fill();
+      c.beginPath(); c.arc(p[0], p[1], r, 0, Math.PI * 2);
+      const col = isV ? Pl.vLabel : Pl.point;
+      if (v.visible) { c.fillStyle = col; c.fill(); } else { c.fillStyle = Pl.halo; c.fill(); c.lineWidth = 2 * scale; c.strokeStyle = col; c.stroke(); }
+      c.restore();
+      if (v.name && v.show_label !== false) drawLabel(c, v.name, p[0] + r + 5 * scale, p[1] - r - 3 * scale, col, scale, 12.5);
+    });
+
+    if (applyViewTransform) c.restore();
+    if (isExport && !state.tier.isPro) drawWatermarkCanvas(c, w, h, state.tier.watermark || 'SECT_3D // CONSTRUCT');
+    return { poly: [], steps: sc.steps || [], snapshots: [] };
+  }
+
+  function buildSceneSvg() {
+    const sc = getRotatedScene(state.renderScene, view.yawDeg, view.pitchDeg), Pl = curPal();
+    const w = 1400, h = Math.round(1400 * (state.imgH / state.imgW)), scale = Math.max(1, w / 650);
+    const P = sceneProjector(sc, w, h);
+    const f = v => (+v).toFixed(2);
+    const out = [`<?xml version="1.0" encoding="UTF-8"?>`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">`,
+      `<rect x="0" y="0" width="${w}" height="${h}" fill="${Pl.bg}" />`];
+    (sc.polygons || []).forEach(pg => {
+      const pts = pg.pts.map(P).map(p => `${f(p[0])},${f(p[1])}`).join(' ');
+      const fill = pg.style === 'section' ? Pl.polyFill : (pg.style === 'plane2' ? Pl.planeFill2 : Pl.planeFill);
+      out.push(`<polygon points="${pts}" fill="${fill}" />`);
+    });
+    (sc.segments || []).forEach(sg => {
+      const a = P(sg.a), b = P(sg.b), st = sceneStyle(Pl, sg.style, scale);
+      const dash = (!sg.visible || sg.style === 'edge_hid' || sg.style === 'ref_line') ? ` stroke-dasharray="${f(6 * scale)} ${f(5 * scale)}"` : '';
+      out.push(`<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" stroke="${st.col}" stroke-width="${f(st.lw)}"${dash} stroke-linecap="round" />`);
+    });
+    const viewDir = sc.dimension === '3d' ? sceneViewDir(sc) : null;
+    (sc.curves || []).forEach(cv => {
+      const st = sceneStyle(Pl, cv.style, scale);
+      if (cv.kind === 'right_angle_mark') return;
+      if (sc.dimension === '3d') {
+        const pts3 = sceneCircle3d(cv.center, cv.normal, cv.radius, 120);
+        for (let i = 0; i + 1 < pts3.length; i++) {
+          const mid = [0, 1, 2].map(k => (pts3[i][k] + pts3[i + 1][k]) / 2 - cv.center[k]);
+          const back = cv.hide_back && viewDir && (mid[0] * viewDir[0] + mid[1] * viewDir[1] + mid[2] * viewDir[2]) < 0;
+          const a = P(pts3[i]), b = P(pts3[i + 1]);
+          out.push(`<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" stroke="${back ? Pl.edgeHid : st.col}" stroke-width="${f(st.lw)}"${back ? ` stroke-dasharray="${f(5 * scale)} ${f(5 * scale)}"` : ''} />`);
+        }
+      } else {
+        const pts = sceneCurve2d(cv).map(P).map(p => `${f(p[0])},${f(p[1])}`).join(' ');
+        out.push(`<polyline points="${pts}" fill="none" stroke="${st.col}" stroke-width="${f(st.lw)}" />`);
+      }
+    });
+    (sc.vertices || []).forEach(v => {
+      const p = P(v.pos), isV = v.role === 'vertex', r = (isV ? 3 : 5) * scale, col = isV ? Pl.vLabel : Pl.point;
+      out.push(`<circle cx="${f(p[0])}" cy="${f(p[1])}" r="${f(r)}" fill="${v.visible ? col : Pl.halo}" stroke="${col}" stroke-width="${f(1.6 * scale)}" />`);
+      if (v.name && v.show_label !== false) out.push(`<text x="${f(p[0] + r + 5 * scale)}" y="${f(p[1] - r - 3 * scale)}" font-family="'JetBrains Mono', monospace" font-weight="700" font-size="${f(12.5 * scale)}" fill="${col}" stroke="${Pl.halo}" stroke-width="${f(4 * scale)}" paint-order="stroke">${escXml(v.name)}</text>`);
+    });
+    out.push('</svg>');
+    return out.join('\n');
+  }
+
+  function sceneParamInputs() {
+    const box = document.getElementById('sceneParams');
+    box.innerHTML = '';
+    const prog = state.sceneProgram;
+    if (!prog || !Array.isArray(prog.nodes)) return;
+    prog.nodes.forEach((node, ni) => {
+      (node.params || []).forEach((prm, pi) => {
+        const m = /^([a-z_0-9]+)=(-?[0-9]+(?:[.][0-9]+)?(?:\/[0-9]+)?|[0-9.*()+\-\/ ]*sqrt\([0-9]+\)[0-9.*()+\-\/ ]*)$/.exec(String(prm).trim());
+        if (!m || ['n'].includes(m[1])) return;
+        const lbl = document.createElement('label');
+        lbl.className = 'param-lbl';
+        lbl.textContent = `${node.id}.${m[1]}=`;
+        const inp = document.createElement('input');
+        inp.className = 'param-in';
+        inp.value = m[2];
+        inp.dataset.node = String(ni); inp.dataset.param = String(pi); inp.dataset.key = m[1];
+        lbl.appendChild(inp);
+        box.appendChild(lbl);
+      });
+    });
+  }
+
+  function setSceneAspect() {
+    const P = sceneProjector(state.renderScene, 1000, 1000);
+    state.imgW = 840;
+    state.imgH = Math.max(360, Math.min(1260, Math.round(840 * (P.aspect || 0.7) * 1.08 + 60)));
+  }
+
+  function enterSceneMode(data) {
+    state.renderScene = data.renderScene;
+    state.sceneProgram = data.sceneProgram || null;
+    state.sceneAnswer = data.renderScene.answer_text || '';
+    setSceneAspect();
+    document.querySelectorAll('.console-dock').forEach(el => { if (el.id !== 'scenePanel') el.style.display = 'none'; });
+    const sb = document.querySelector('.shape-bar'); if (sb) sb.style.display = 'none';
+    document.getElementById('scenePanel').style.display = 'flex';
+    document.getElementById('scenePaperCb').checked = Boolean(document.getElementById('paperThemeCb').checked);
+    rainCanvas.style.display = 'none';
+    sceneParamInputs();
+    document.getElementById('sceneRecalcBtn').disabled = !(apiBase && tg?.initData && state.sceneProgram);
+    resetView(false);
+  }
+
+  function exitSceneMode() {
+    state.renderScene = null; state.sceneProgram = null; state.sceneAnswer = '';
+    document.querySelectorAll('.console-dock').forEach(el => { el.style.display = el.id === 'scenePanel' ? 'none' : 'flex'; });
+    const sb = document.querySelector('.shape-bar'); if (sb) sb.style.display = 'flex';
+    state.imgW = 840; state.imgH = 580;
+    if (!state.img) rainCanvas.style.display = 'block';
+    resetView(false);
+    draw();
+  }
+
+  function drawSceneMode() {
+    canvas.width = state.imgW; canvas.height = state.imgH;
+    const res = renderSceneToContext(ctx, state.imgW, state.imgH, false);
+    document.getElementById('sceneAnswer').textContent = state.sceneAnswer ? `ОТВЕТ: ${state.sceneAnswer}` : '';
+    const zoomTag = Math.abs(view.zoom - 1) > 0.05 ? ` · ${view.zoom.toFixed(1)}×` : '';
+    document.getElementById('hudStatus').textContent = 'СЦЕНА · ТОЧНО' + zoomTag;
+    document.getElementById('hudShape').textContent = (state.renderScene.title || 'РЕШЕНИЕ').toUpperCase().slice(0, 24);
+    document.getElementById('polyKindTag').textContent = '[ СЦЕНА ]';
+    document.getElementById('stepPlayer').style.display = 'none';
+    const list = document.getElementById('stepsList');
+    list.innerHTML = (res.steps.length ? res.steps : ['Шагов нет']).map((s, i) =>
+      `<li><span class="trace-idx">${String(i + 1).padStart(2, '0')}&gt;</span><span>${escXml(s)}</span></li>`).join('');
+    document.getElementById('saveToChatBtn').style.display = 'none';
+    document.getElementById('sendTgBtn').style.display = 'none';
+    syncViewUi();
+  }
+
+  async function recalcScene() {
+    if (!state.sceneProgram || !apiBase || !tg?.initData) return;
+    const prog = JSON.parse(JSON.stringify(state.sceneProgram));
+    document.querySelectorAll('#sceneParams .param-in').forEach(inp => {
+      const ni = Number(inp.dataset.node), pi = Number(inp.dataset.param);
+      prog.nodes[ni].params[pi] = `${inp.dataset.key}=${inp.value.trim()}`;
+    });
+    const btn = document.getElementById('sceneRecalcBtn');
+    btn.disabled = true;
+    setNetStatus('[ ПЕРЕСЧЁТ_НА_СЕРВЕРЕ... ]');
+    try {
+      const resp = await fetch(`${apiBase}/api/solve_preview`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData, scene_program: prog })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      state.renderScene = data.scene;
+      state.sceneProgram = prog;
+      state.sceneAnswer = data.answer_text || '';
+      setSceneAspect();
+      draw();
+      setNetStatus('[ ПЕРЕСЧИТАНО ]');
+      setTimeout(() => setNetStatus(''), 1500);
+    } catch (err) {
+      setNetStatus(`[ ОШИБКА: ${err.message} ]`, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   state.tier = { isPro: false, known: false, botUsername: '', watermark: 'SECT_3D // CONSTRUCT' };
 
   function applyTierUi() {
@@ -1410,23 +2158,12 @@
   }
 
   function renderToContext(targetCtx, w, h, isExport = false) {
+    if (state.renderScene) return renderSceneToContext(targetCtx, w, h, isExport);
     targetCtx.clearRect(0, 0, w, h);
     const flags = getRenderFlags();
     const P = curPal();
 
-    if (state.img) {
-      targetCtx.drawImage(state.img, 0, 0, w, h);
-      if (flags.greenFilter) {
-        targetCtx.save();
-        targetCtx.globalCompositeOperation = 'multiply';
-        targetCtx.fillStyle = '#00FF41';
-        targetCtx.fillRect(0, 0, w, h);
-        targetCtx.globalCompositeOperation = 'source-over';
-        targetCtx.fillStyle = 'rgba(0, 255, 65, 0.10)';
-        targetCtx.fillRect(0, 0, w, h);
-        targetCtx.restore();
-      }
-    } else {
+    if (!state.img) {
       if (isExport || P.paper) {
         targetCtx.fillStyle = P.bg;
         targetCtx.fillRect(0, 0, w, h);
@@ -1440,10 +2177,34 @@
       for (let gy = step; gy < h; gy += step) { targetCtx.moveTo(0, gy); targetCtx.lineTo(w, gy); }
       targetCtx.stroke();
       targetCtx.restore();
+    } else if (isExport || P.paper) {
+      targetCtx.fillStyle = P.bg;
+      targetCtx.fillRect(0, 0, w, h);
+    }
+
+    const applyViewTransform = !isExport && (view.zoom !== 1 || view.panX !== 0 || view.panY !== 0);
+    if (applyViewTransform) {
+      targetCtx.save();
+      targetCtx.translate(view.panX * w, view.panY * h);
+      targetCtx.scale(view.zoom, view.zoom);
+    }
+
+    if (state.img) {
+      targetCtx.drawImage(state.img, 0, 0, w, h);
+      if (flags.greenFilter) {
+        targetCtx.save();
+        targetCtx.globalCompositeOperation = 'multiply';
+        targetCtx.fillStyle = '#00FF41';
+        targetCtx.fillRect(0, 0, w, h);
+        targetCtx.globalCompositeOperation = 'source-over';
+        targetCtx.fillStyle = 'rgba(0, 255, 65, 0.10)';
+        targetCtx.fillRect(0, 0, w, h);
+        targetCtx.restore();
+      }
     }
 
     const res = computeSection();
-    const { geom, basis, faceVisible, edgeVisible, poly, segVis } = res;
+    const { geom, anchors, basis, faceVisible, edgeVisible, poly, segVis } = res;
     const active = resolveActiveStepData(res);
     const X = p => p.x * w, Y = p => p.y * h;
     const scale = Math.max(1, w / 650);
@@ -1578,7 +2339,7 @@
     });
 
     if (!isExport && state.mode === 'anchors') {
-      state.anchors.forEach((a, idx) => {
+      anchors.forEach((a, idx) => {
         const vIdx = geom.anchors[idx];
         drawBracketReticle(targetCtx, X(a), Y(a), 10 * scale, '#00FF41', scale);
         drawLabel(targetCtx, geom.labels[vIdx], X(a) - 18*scale, Y(a) - 10*scale, '#00FF41', scale, 12);
@@ -1595,6 +2356,8 @@
       if (sp.tag) drawLabel(targetCtx, sp.tag, sp.x2 * w + 12*scale, sp.y2 * h + 14*scale, '#9CFFAE', scale, 11);
     }
 
+    if (applyViewTransform) targetCtx.restore();
+
     if (isExport && !state.tier.isPro) {
       drawWatermarkCanvas(targetCtx, w, h, state.tier.watermark || 'SECT_3D // CONSTRUCT');
     }
@@ -1607,6 +2370,7 @@
   }
 
   function buildExportSvg() {
+    if (state.renderScene) return buildSceneSvg();
     const w = state.img ? state.img.naturalWidth : 1400;
     const h = state.img ? state.img.naturalHeight : Math.round(1400 * (state.imgH / state.imgW));
     const scale = Math.max(1, w / 650);
@@ -1773,13 +2537,15 @@
   }
 
   function draw() {
+    if (state.renderScene) { drawSceneMode(); return; }
     canvas.width = state.imgW;
     canvas.height = state.imgH;
     const res = renderToContext(ctx, state.imgW, state.imgH, false);
 
     if (state.dragging && state.pointerPos) {
       const s = Math.min(state.imgW, state.imgH) * 0.25;
-      const mx = state.pointerPos.x * state.imgW, my = state.pointerPos.y * state.imgH;
+      const mx = (state.pointerPos.x * view.zoom + view.panX) * state.imgW;
+      const my = (state.pointerPos.y * view.zoom + view.panY) * state.imgH;
       const lx = mx < state.imgW * 0.5 ? state.imgW - s - 10 : 10, ly = 10;
       ctx.save();
       ctx.fillStyle = '#000000';
@@ -1798,10 +2564,12 @@
     }
 
     updateStepPlayerUI(res);
+    syncViewUi();
 
     document.getElementById('modePointsBtn').textContent = `02 // ТОЧКИ [${state.points.length}/3]`;
     const polyKind = res.poly.length >= 3 ? `${res.poly.length}-УГ.` : `ТОЧЕК ${state.points.length}/3`;
-    document.getElementById('hudStatus').textContent = (state.mode === 'anchors' ? 'КАРКАС · ' : 'СЕЧЕНИЕ · ') + polyKind;
+    const zoomTag = Math.abs(view.zoom - 1) > 0.05 ? ` · ${view.zoom.toFixed(1)}×` : '';
+    document.getElementById('hudStatus').textContent = (state.mode === 'anchors' ? 'КАРКАС · ' : 'СЕЧЕНИЕ · ') + polyKind + zoomTag;
     document.getElementById('polyKindTag').textContent = res.poly.length >= 3 ? `[ ${res.poly.length}-УГОЛЬНИК ]` : '[ ОЖИДАНИЕ ]';
 
     const list = document.getElementById('stepsList');
@@ -1830,28 +2598,112 @@
     }
   }
 
-  // ---------- 8. Ввод и события ----------
-  function getNormPos(e) {
+  // ---------- 8. Ввод: колесо мыши, два пальца (pinch+pan), перетаскивание и 3D-ползунки ----------
+  const activePointers = new Map();
+  let pinchState = null;
+  let panState = null;
+  let pendingPoint = null;
+  let suppressSingleUntil = 0;
+
+  function clientToScreenNorm(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    const cx = e.touches ? e.touches[0].clientX : e.clientX;
-    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
     return {
-      x: Math.max(0, Math.min(1, (cx - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (cy - rect.top) / rect.height))
+      sx: (clientX - rect.left) / w,
+      sy: (clientY - rect.top) / h,
+      rectW: w,
+      rectH: h
     };
   }
 
+  function screenNormToWorld(sx, sy, clamp = true) {
+    const x = (sx - view.panX) / view.zoom;
+    const y = (sy - view.panY) / view.zoom;
+    return clamp
+      ? { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+      : { x, y };
+  }
+
+  function getNormPos(e) {
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    const { sx, sy } = clientToScreenNorm(cx, cy);
+    return screenNormToWorld(sx, sy, true);
+  }
+
+  function bakeRotationIntoAnchors() {
+    if (Math.abs(view.yawDeg) < 1e-4 && Math.abs(view.pitchDeg) < 1e-4) return;
+    const tf = getActiveManualTransform();
+    state.anchors = tf.anchors.map(a => ({ x: a.x, y: a.y }));
+    state.flipDepth = tf.flipDepth;
+    view.yawDeg = 0;
+    view.pitchDeg = 0;
+    syncViewUi();
+  }
+
+  function startPinch() {
+    const pts = Array.from(activePointers.values());
+    if (pts.length < 2) return;
+    const [a, b] = pts;
+    const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+    const mid = clientToScreenNorm(0.5 * (a.clientX + b.clientX), 0.5 * (a.clientY + b.clientY));
+    pinchState = {
+      startDist: Math.max(10, dist),
+      startZoom: view.zoom,
+      prevMidSx: mid.sx,
+      prevMidSy: mid.sy
+    };
+    // При переходе в жест двумя пальцами отменяем случайное касание точкой/перетаскиванием
+    pendingPoint = null;
+    panState = null;
+    if (state.dragging) {
+      state.dragging = null;
+      state.pointerPos = null;
+      draw();
+    }
+    suppressSingleUntil = performance.now() + 260;
+  }
+
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  document.getElementById('viewport').addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const { sx, sy } = clientToScreenNorm(e.clientX, e.clientY);
+    const factor = Math.exp(-e.deltaY * 0.0014);
+    zoomAt(view.zoom * factor, sx, sy);
+  }, { passive: false });
+
   canvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    const pos = getNormPos(e);
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
+    if (activePointers.size >= 2) {
+      startPinch();
+      return;
+    }
+
+    if (performance.now() < suppressSingleUntil) return;
+
+    const { sx, sy, rectW } = clientToScreenNorm(e.clientX, e.clientY);
+    const pos = screenNormToWorld(sx, sy, true);
     state.pointerPos = pos;
-    const hitR = 26 / canvas.getBoundingClientRect().width;
+
+    // Средняя/правая кнопка или Alt/Shift — всегда панорамирование
+    if (e.button === 1 || e.button === 2 || e.altKey || e.shiftKey || state.renderScene) {
+      panState = { pointerId: e.pointerId, lastSx: sx, lastSy: sy };
+      return;
+    }
+
+    const hitR = (26 / rectW) / view.zoom;
     const geom = buildShapeGeom(state.shapeKey, state.extraBase);
-    const basis = getBasis();
+    const tf = getActiveManualTransform();
+    const basis = tf.basis;
 
     if (state.mode === 'anchors') {
       let best = null, bestD = hitR;
-      state.anchors.forEach((a, i) => {
+      tf.anchors.forEach((a, i) => {
         const d = Math.hypot(a.x - pos.x, a.y - pos.y);
         if (d < bestD) { bestD = d; best = { type: 'anchor', idx: i }; }
       });
@@ -1860,7 +2712,12 @@
         const d = Math.hypot(p2.x - pos.x, p2.y - pos.y);
         if (d < bestD) { bestD = d; best = { type: 'extra', idx: extraIdx }; }
       });
-      if (best) state.dragging = best;
+      if (best) {
+        bakeRotationIntoAnchors();
+        state.dragging = best;
+      } else if (view.zoom > 1.01) {
+        panState = { pointerId: e.pointerId, lastSx: sx, lastSy: sy };
+      }
     } else {
       let best = -1, bestD = hitR;
       state.points.forEach((pt, i) => {
@@ -1870,19 +2727,73 @@
       });
       if (best >= 0) {
         state.dragging = { type: 'point', idx: best };
-      } else if (state.points.length < 3) {
-        const snap = findSnap3D(pos.x, pos.y);
-        if (snap) {
-          state.points.push({ p3: snap.p3 });
-          state.playStep = null;
-          try { tg?.HapticFeedback?.impactOccurred('light'); } catch (_) {}
-          draw();
-        }
+      } else {
+        // Откладываем постановку новой точки до pointerup, чтобы 2-пальцевый зум на мобиле не ставил лишнюю точку
+        pendingPoint = {
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          lastSx: sx,
+          lastSy: sy,
+          pos
+        };
       }
     }
   });
 
   window.addEventListener('pointermove', (e) => {
+    if (activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+    }
+
+    if (activePointers.size >= 2 && pinchState) {
+      e.preventDefault();
+      const [a, b] = Array.from(activePointers.values());
+      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      const mid = clientToScreenNorm(0.5 * (a.clientX + b.clientX), 0.5 * (a.clientY + b.clientY));
+
+      // Сдвиг середины пальцев -> панорамирование
+      view.panX += (mid.sx - pinchState.prevMidSx);
+      view.panY += (mid.sy - pinchState.prevMidSy);
+      pinchState.prevMidSx = mid.sx;
+      pinchState.prevMidSy = mid.sy;
+
+      const targetZoom = pinchState.startZoom * (dist / pinchState.startDist);
+      zoomAt(targetZoom, mid.sx, mid.sy);
+      return;
+    }
+
+    if (panState && panState.pointerId === e.pointerId) {
+      e.preventDefault();
+      const { sx, sy } = clientToScreenNorm(e.clientX, e.clientY);
+      view.panX += (sx - panState.lastSx);
+      view.panY += (sy - panState.lastSy);
+      panState.lastSx = sx;
+      panState.lastSy = sy;
+      clampPan();
+      draw();
+      return;
+    }
+
+    if (pendingPoint && pendingPoint.pointerId === e.pointerId) {
+      const moved = Math.hypot(e.clientX - pendingPoint.startX, e.clientY - pendingPoint.startY);
+      if (moved > 12) {
+        if (view.zoom > 1.01) {
+          panState = { pointerId: e.pointerId, lastSx: pendingPoint.lastSx, lastSy: pendingPoint.lastSy };
+          pendingPoint = null;
+          const { sx, sy } = clientToScreenNorm(e.clientX, e.clientY);
+          view.panX += (sx - panState.lastSx);
+          view.panY += (sy - panState.lastSy);
+          panState.lastSx = sx;
+          panState.lastSy = sy;
+          clampPan();
+          draw();
+          return;
+        }
+        pendingPoint = null;
+      }
+    }
+
     const pos = getNormPos(e);
     state.pointerPos = pos;
     if (state.dragging) {
@@ -1899,21 +2810,76 @@
         if (snap) state.points[state.dragging.idx].p3 = snap.p3;
       }
       draw();
-    } else if (state.mode === 'points' && state.points.length < 3) {
+    } else if (!state.renderScene && state.mode === 'points' && state.points.length < 3 && activePointers.size === 0) {
       state.snapPreview = findSnap3D(pos.x, pos.y);
       draw();
     }
   });
 
-  function stopDrag() {
+  function stopPointer(e) {
+    const hadPointer = activePointers.has(e.pointerId);
+    activePointers.delete(e.pointerId);
+
+    if (pinchState) {
+      if (activePointers.size < 2) {
+        pinchState = null;
+        suppressSingleUntil = performance.now() + 220;
+      }
+      if (activePointers.size === 0) {
+        state.dragging = null;
+        state.pointerPos = null;
+        draw();
+      }
+      return;
+    }
+
+    if (panState && panState.pointerId === e.pointerId) {
+      panState = null;
+    }
+
+    if (pendingPoint && pendingPoint.pointerId === e.pointerId) {
+      const pp = pendingPoint;
+      pendingPoint = null;
+      if (hadPointer && performance.now() >= suppressSingleUntil && !state.renderScene && state.mode === 'points' && state.points.length < 3) {
+        const moved = Math.hypot(e.clientX - pp.startX, e.clientY - pp.startY);
+        if (moved <= 12) {
+          const snap = findSnap3D(pp.pos.x, pp.pos.y);
+          if (snap) {
+            state.points.push({ p3: snap.p3 });
+            state.playStep = null;
+            try { tg?.HapticFeedback?.impactOccurred('light'); } catch (_) {}
+            draw();
+          }
+        }
+      }
+    }
+
     if (state.dragging || state.pointerPos) {
       state.dragging = null;
       state.pointerPos = null;
       draw();
     }
   }
-  window.addEventListener('pointerup', stopDrag);
-  window.addEventListener('pointercancel', stopDrag);
+  window.addEventListener('pointerup', stopPointer);
+  window.addEventListener('pointercancel', stopPointer);
+
+  // Ползунки 3D-вращения и сброс вида
+  document.getElementById('yawRange').addEventListener('input', (e) => {
+    view.yawDeg = Number(e.target.value) || 0;
+    state.snapPreview = null;
+    syncViewUi();
+    draw();
+  });
+  document.getElementById('pitchRange').addEventListener('input', (e) => {
+    view.pitchDeg = Number(e.target.value) || 0;
+    state.snapPreview = null;
+    syncViewUi();
+    draw();
+  });
+  document.getElementById('resetViewBtn').addEventListener('click', () => {
+    resetView(true);
+    try { tg?.HapticFeedback?.impactOccurred('light'); } catch (_) {}
+  });
 
   document.getElementById('shapeBar').addEventListener('click', (e) => {
     const card = e.target.closest('.shape-slot');
@@ -1936,6 +2902,7 @@
         rainCanvas.style.display = 'none';
         document.getElementById('clearPhotoBtn').style.display = 'inline-flex';
         document.getElementById('greenFilterWrap').style.display = 'inline-flex';
+        resetView(false);
         draw();
       };
       img.src = ev.target.result;
@@ -1950,6 +2917,7 @@
     document.getElementById('greenFilterWrap').style.display = 'none';
     rainCanvas.style.display = 'block';
     requestAnimationFrame(tickRain);
+    resetView(false);
     draw();
   });
 
@@ -2050,7 +3018,6 @@
 
   document.getElementById('exportSvgBtn').addEventListener('click', () => {
     if (!state.tier.isPro) {
-      // Векторные чертежи без водяного знака — фишка PRO (репетиторы, печать, презентации)
       setNetStatus('[ SVG-ЭКСПОРТ БЕЗ ВОДЯНОГО ЗНАКА — ФУНКЦИЯ PRO. PNG доступен бесплатно ]', true);
       try { tg?.HapticFeedback?.notificationOccurred('warning'); } catch (_) {}
       const bu = state.tier.botUsername;
@@ -2075,6 +3042,7 @@
     if (!apiBase || !tg?.initData || state.points.length < 3) return;
     const btn = document.getElementById('saveToChatBtn');
     const flags = getRenderFlags();
+    const tf = getActiveManualTransform();
     btn.disabled = true;
     btn.textContent = '> ОТПРАВКА...';
     setNetStatus('[ РЕНДЕР И ОТПРАВКА В ЧАТ... ]');
@@ -2085,11 +3053,11 @@
       state: {
         shape: state.shapeKey,
         aspect: +(state.imgW / Math.max(1, state.imgH)).toFixed(4),
-        anchors: state.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
+        anchors: tf.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
         extraBase: state.extraBase.map(xy => [+xy[0].toFixed(4), +xy[1].toFixed(4)]),
         points3: state.points.map(p => p.p3.map(v => +v.toFixed(4))),
         ptNames: ptNames.slice(0, 3),
-        flipDepth: Boolean(state.flipDepth),
+        flipDepth: Boolean(tf.flipDepth),
         showHatch: flags.showHatch,
         showTrace: flags.showTrace,
         showLabels: flags.showLabels,
@@ -2132,18 +3100,24 @@
 
   document.getElementById('sendTgBtn').addEventListener('click', () => {
     if (!tg) return;
+    const tf = getActiveManualTransform();
     tg.sendData(JSON.stringify({
       shape: state.shapeKey,
       aspect: +(state.imgW / Math.max(1, state.imgH)).toFixed(4),
-      anchors: state.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
+      anchors: tf.anchors.map(a => [+a.x.toFixed(4), +a.y.toFixed(4)]),
       extraBase: state.extraBase,
       points3: state.points.map(p => p.p3.map(v => +v.toFixed(4))),
       ptNames: ptNames.slice(0, 3),
-      flipDepth: Boolean(state.flipDepth)
+      flipDepth: Boolean(tf.flipDepth)
     }));
   });
 
-  window.addEventListener('resize', () => { if (!state.img) initRain(); });
+  document.getElementById('sceneRecalcBtn').addEventListener('click', recalcScene);
+  document.getElementById('sceneExitBtn').addEventListener('click', exitSceneMode);
+  document.getElementById('scenePaperCb').addEventListener('change', () => draw());
+
+  window.addEventListener('resize', () => { if (!state.img && !state.renderScene) initRain(); });
+  syncViewUi();
   draw();
   initRain();
   requestAnimationFrame(tickRain);
